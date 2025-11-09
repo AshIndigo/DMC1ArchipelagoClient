@@ -1,0 +1,10 @@
+[package]
+name = "DMC1ArchipelagoClient"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "dmc1_randomizer"
+crate-type = ["cdylib"]
+
+[dependencies]

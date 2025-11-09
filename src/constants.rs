@@ -1,0 +1,1 @@
+pub const MAX_HP: f32 = 20000.0;
