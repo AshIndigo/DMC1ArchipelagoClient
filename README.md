@@ -1,2 +1,15 @@
-# DMC1ArchipelagoClient
-Archipelago based randomizer for Devil May Cry 1 (HD Collection)
+## Devil May Cry 1 Archipelago Randomizer
+
+See APWorld setup document for installation instructions
+https://github.com/AshIndigo/Archipelago/blob/dmc1-world/worlds/dmc1/docs/en_setup.md
+
+## Credits
+Elusive for testing help/putting up with my rants
+
+thePalindrome for putting up with my ramblings
+
+DDMK for being an invaluable tool for development
+
+Capcom for making this wonderful series
+
+Roboto License: https://openfontlicense.org/open-font-license-official-text/

@@ -162,7 +162,11 @@ where
 {
     let addr = *SESSION_PTR;
     unsafe {
-        let s = &*(read_data_from_address::<*const SessionData>(addr));
+        let ptr_to_data = read_data_from_address::<*const SessionData>(addr);
+        if ptr_to_data.is_null() {
+            return Err(SessionError::NotUsable);
+        }
+        let s =  &*(ptr_to_data);
         if !session_is_valid(s) {
             return Err(SessionError::NotUsable);
         }
@@ -176,7 +180,11 @@ where
 {
     let addr = *SESSION_PTR;
     unsafe {
-        let s = &mut *(read_data_from_address::<*mut SessionData>(addr));
+        let ptr_to_data = read_data_from_address::<*mut SessionData>(addr);
+        if ptr_to_data.is_null() {
+            return Err(SessionError::NotUsable);
+        }
+        let s = &mut *(ptr_to_data);
         if !session_is_valid(s) {
             return Err(SessionError::NotUsable);
         }
@@ -191,12 +199,6 @@ fn session_is_valid(_s: &SessionData) -> bool {
 /// Get current mission
 pub fn get_mission() -> u8 {
     with_session_read(|s| s.mission).unwrap()
-}
-
-/// Get current room
-pub fn get_room() -> i32 {
-    // TODO Not right, need to grab EventData according to DDMK
-    with_session_read(|s| s.event).unwrap() as i32
 }
 
 /// Get current difficulty
@@ -257,7 +259,11 @@ where
 {
     let addr = *PLAYER_PTR;
     unsafe {
-        let s = &*(read_data_from_address::<*const PlayerData>(addr)); // addr as *const PlayerData
+        let ptr_to_data = read_data_from_address::<*const PlayerData>(addr);
+        if ptr_to_data.is_null() {
+            return Err(PlayerDataError::NotUsable);
+        }
+        let s =  &*(ptr_to_data);
         if !player_data_valid(s) {
             return Err(PlayerDataError::NotUsable);
         }
@@ -271,7 +277,11 @@ where
 {
     let addr = *PLAYER_PTR;
     unsafe {
-        let s = &mut *(read_data_from_address::<*mut PlayerData>(addr));
+        let ptr_to_data = read_data_from_address::<*mut PlayerData>(addr);
+        if ptr_to_data.is_null() {
+            return Err(PlayerDataError::NotUsable);
+        }
+        let s = &mut *(ptr_to_data);
         if !player_data_valid(s) {
             return Err(PlayerDataError::NotUsable);
         }
@@ -284,4 +294,55 @@ fn player_data_valid(_s: &PlayerData) -> bool {
         return true;
     }
     false
+}
+
+#[repr(C)]
+pub struct EventData {
+    unknown: [u8; 624],
+    track: u32,
+    room: u32,
+    unknown1: [u8; 16],
+    next_track: u32,
+    next_room: u32,
+}
+
+const EVENT_DATA: usize = 0x60B148;
+
+static EVENT_DATA_PTR: LazyLock<usize> = LazyLock::new(|| *DMC1_ADDRESS + EVENT_DATA);
+
+pub fn with_event_data_read<F, R>(f: F) -> Result<R, PlayerDataError>
+where
+    F: FnOnce(&EventData) -> R,
+{
+    let addr = *EVENT_DATA_PTR;
+    unsafe {
+        let s = &*(read_data_from_address::<*const EventData>(addr));
+        if !event_data_valid(s) {
+            return Err(PlayerDataError::NotUsable);
+        }
+        Ok(f(s))
+    }
+}
+
+fn event_data_valid(_s: &EventData) -> bool {
+    if *EVENT_DATA_PTR != 0 {
+        return true;
+    }
+    false
+}
+
+/// Get current room
+pub fn get_room() -> i32 {
+    with_event_data_read(|s| s.room).unwrap() as i32
+}
+
+/// Get the current track
+/// Tracks:
+/// - Track 1: Castle area
+/// - Track 2: Outside castle
+/// - Track 3: Evil Castle IIRC?
+/// - Track 4: Hell
+/// - Track 5: Boat
+pub fn get_track() -> i32 {
+    with_event_data_read(|s| s.track).unwrap() as i32
 }

@@ -1,0 +1,55 @@
+use std::fs;
+use std::path::Path;
+
+fn main() {
+    println!("cargo:rerun-if-changed=./src/data/locations.json");
+    println!("cargo:rustc-link-lib=msvcrt");
+    // Read the JSON file
+    let input_path = Path::new("src/data/locations.json");
+    let content = fs::read_to_string(input_path).expect("Unable to read locations.json");
+
+    // Parse JSON
+    let data: serde_json::Value = serde_json::from_str(&content).expect("Invalid JSON");
+
+    // Initial stuff for the rust file
+    let mut output = String::from("// Auto-generated constants file\n\n");
+    output.push_str("use std::collections::HashMap;\n");
+    output.push_str("use crate::constants::ItemEntry;\nuse std::sync::LazyLock;\n\n");
+    output.push_str("use crate::constants::Coordinates;\nuse crate::constants::EMPTY_COORDINATES;\n");
+
+    output.push_str("pub static ITEM_MISSION_MAP: LazyLock<HashMap<&'static str, ItemEntry>> = LazyLock::new(|| {
+    HashMap::from([\n");
+    for (key, value) in data.as_object().expect("Expected JSON object") {
+        let offset = value["offset"].as_u64().unwrap();
+        let mission_number = value["mission_number"].as_u64().unwrap();
+        let room = value["room_number"].as_u64().unwrap();
+        let track = value["track_number"].as_u64().unwrap();
+        let item_id = value["default_item"].as_u64().unwrap();
+        let x_coord = value["xCoord"].as_u64().unwrap();
+        let y_coord = value["yCoord"].as_u64().unwrap();
+        let z_coord = value["zCoord"].as_u64().unwrap();
+        output.push_str(&format!(
+            r#"        ("{}", ItemEntry {{ offset: {}, mission: {}, room_number: {}, track_number: {}, item_id: {}, coordinates: "#,
+            key, offset, mission_number, room, track, item_id
+        ));
+        if x_coord != 0 {
+            output.push_str(&format!(
+                "Coordinates {{ x: {}, y: {}, z: {} }}",
+                x_coord, y_coord, z_coord
+            ));
+        } else {
+            output.push_str("EMPTY_COORDINATES");
+        }
+
+        output.push_str("}),\n");
+    }
+    output.push_str(
+        "    ])\
+    });\n\n",
+    );
+
+    // Write to src folder
+    let out_dir = Path::new("src");
+    let dest_path = Path::new(&out_dir).join("data/generated_locations.rs");
+    fs::write(dest_path, output).expect("Unable to write generated_locations");
+}
