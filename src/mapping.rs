@@ -30,7 +30,6 @@ where
     let val = Value::deserialize(deserializer)?;
     match val {
         Value::Number(n) => match n.as_i64().unwrap_or_default() {
-            // TODO Can't remove starting Ebony & Ivory
             0 => Ok("Handgun".to_string()),
             1 => Ok("Shotgun".to_string()),
             // Needlegun wouldn't be usable

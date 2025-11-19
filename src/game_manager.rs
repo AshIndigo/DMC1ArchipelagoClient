@@ -74,7 +74,7 @@ impl ArchipelagoData {
 pub(crate) const GAME_SESSION_DATA: usize = 0x5EAB88;
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct ItemData {
     // Size 4
     pub category: u8,
@@ -118,7 +118,7 @@ pub struct SessionData {
     unknown3: [u8; 7168],
     event: u32,
     unknown4: [u8; 444],
-    mission: u8,
+    pub(crate) mission: u8,
     unknown5: u8,
     difficulty: u8,
     character: u8,
@@ -166,7 +166,7 @@ where
         if ptr_to_data.is_null() {
             return Err(SessionError::NotUsable);
         }
-        let s =  &*(ptr_to_data);
+        let s = &*(ptr_to_data);
         if !session_is_valid(s) {
             return Err(SessionError::NotUsable);
         }
@@ -263,7 +263,7 @@ where
         if ptr_to_data.is_null() {
             return Err(PlayerDataError::NotUsable);
         }
-        let s =  &*(ptr_to_data);
+        let s = &*(ptr_to_data);
         if !player_data_valid(s) {
             return Err(PlayerDataError::NotUsable);
         }

@@ -94,16 +94,14 @@ static SKILLS_MAP: LazyLock<HashMap<&str, SkillData>> = LazyLock::new(|| HashMap
 static DEFAULT_SKILLS: [u8; 4] = [0x0, 0x0, 0x0, 0x0];  // I should see what else this lets me control...
 
 pub(crate) fn reset_expertise() {
-    game_manager::with_session(|s| {
+    match game_manager::with_session(|s| {
         s.expertise = DEFAULT_SKILLS;
-    }).unwrap_or({
-        log::error!("Failed to reset expertise, session data is most likely unavailable");
-    });
-    game_manager::with_active_player_data(|d| {
-        //d.expertise = DEFAULT_SKILLS;
-    }).unwrap_or({
-        log::error!("Failed to reset expertise, player data is most likely unavailable");
-    });
+    }) {
+        Ok(_) => {}
+        Err(err) => {
+            log::error!("Failed to reset expertise: {:?}", err);
+        }
+    }
 }
 
 fn give_skill(skill_name: &&'static str) {

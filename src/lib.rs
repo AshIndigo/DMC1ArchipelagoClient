@@ -111,8 +111,6 @@ pub(crate) async fn spawn_archipelago_thread() {
             connection_manager::auto_connect();
         });
     }
-    // TODO Don't keep here
-    //hook::install_initial_functions(); // Hooks needed to modify the game
     loop {
         // Wait for a connection request
         let Some(item) = rx_connect.recv().await else {

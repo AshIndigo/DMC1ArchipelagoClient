@@ -46,7 +46,7 @@ pub(crate) enum ItemCategory {
 pub(crate) const ALL_ITEMS: [Item; 43] = [
     Item {
         id: 0,
-        name: "Handgun", // TODO Can't seem to get rid of the default Handguns due to their category+id
+        name: "Handgun",
         category: 0,
         mission: None,
         group: ItemCategory::Weapon

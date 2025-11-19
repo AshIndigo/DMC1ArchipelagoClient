@@ -411,7 +411,7 @@ pub(crate) async fn handle_received_items_packet(
         match ARCHIPELAGO_DATA.write() {
             Ok(mut data) => {
                 *data = game_manager::ArchipelagoData::default();
-                skill_manager::reset_expertise();
+                //skill_manager::reset_expertise();
                 for item in &received_items_packet.items {
                     match item.item {
                         5 => {

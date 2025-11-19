@@ -3,7 +3,7 @@ use crate::game_manager::{with_active_player_data, with_session, ItemData, Playe
 use randomizer_utilities::get_base_address;
 use std::sync::LazyLock;
 use randomizer_utilities::cache::DATA_PACKAGE;
-use crate::constants::GAME_NAME;
+use crate::constants::{ALL_ITEMS, GAME_NAME};
 
 pub static DMC1_ADDRESS: LazyLock<usize> = LazyLock::new(|| get_base_address("dmc1.exe"));
 
@@ -16,9 +16,7 @@ pub fn insert_unique_item_into_inv(item_data: &ItemData) {
         for i in 0..s.item_count {
             let item = &mut s.item_data[i as usize];
             if item == item_data {
-                log::debug!("Item found");
                 item.count = item_data.count;
-                //log::debug!("Item data: {:#?}", &s.item_data[0..20]);
                 return;
             }
         }
@@ -27,8 +25,6 @@ pub fn insert_unique_item_into_inv(item_data: &ItemData) {
         item.id = item_data.id;
         item.count = item_data.count;
         s.item_count += 1;
-        log::debug!("Item not found");
-        //log::debug!("Item data: {:#?}", &s.item_data[0..20]);
     }).unwrap();
 }
 
@@ -37,9 +33,7 @@ pub fn insert_item_into_inv(item_data: &ItemData) {
         for i in 0..s.item_count {
             let item = &mut s.item_data[i as usize];
             if item == item_data {
-                log::debug!("Item found");
                 item.count += item_data.count;
-                log::debug!("Item data: {:#?}", &s.item_data[0..20]);
                 return;
             }
         }
@@ -48,8 +42,6 @@ pub fn insert_item_into_inv(item_data: &ItemData) {
         item.id = item_data.id;
         item.count = item_data.count;
         s.item_count += 1;
-        log::debug!("Item not found");
-        log::debug!("Item data: {:#?}", &s.item_data[0..20]);
     }).unwrap();
 }
 
@@ -70,10 +62,9 @@ pub(crate) fn clear_item_slot(item_data: &ItemData) {
         for i in 0..s.item_count {
             let item = &mut s.item_data[i as usize];
             if item == item_data {
-                log::debug!("Item found");
-                item.id = 0;
-                item.category = 0;
-                item.count = 0;
+                // Swap in last element
+                s.item_data[i as usize] = s.item_data[(s.item_count-1) as usize];
+                s.item_count -= 1;
                 return;
             }
         }
