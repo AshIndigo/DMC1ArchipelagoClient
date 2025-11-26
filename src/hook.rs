@@ -61,6 +61,7 @@ fn enable_hooks() {
         check_handler::ADD_ITEM_ADDR,
         check_handler::DISPLAY_ITEMS_ADDR,
         SETUP_NEW_SESSION_ADDR,
+        check_handler::MISSION_COMPLETE_ADDR,
     ];
     addresses.iter().for_each(|addr| unsafe {
         match MinHook::enable_hook((*DMC1_ADDRESS + addr) as *mut _) {
@@ -135,7 +136,7 @@ fn set_equipment() {
         with_active_player_data(|d| {
             if !data
                 .items
-                .contains(constants::GUN_MAP.get_by_right(&d.gun).unwrap())
+                .contains(constants::GUN_MAP.get_by_right(&d.gun).expect(format!("Unexpected gun value: {}", d.gun).as_str()))
             {
                 // Set the actor data and make sure to update the equipped gun, otherwise weirdness happens (I.e double wielding shotguns)
                 d.gun = *constants::GUN_MAP
@@ -145,7 +146,7 @@ fn set_equipment() {
             }
             if !data
                 .items
-                .contains(constants::MELEE_MAP.get_by_right(&d.melee).unwrap())
+                .contains(constants::MELEE_MAP.get_by_right(&d.melee).expect(format!("Unexpected melee value: {}", d.melee).as_str()))
             {
                 // Set actor data then update melee
                 d.melee = *constants::MELEE_MAP

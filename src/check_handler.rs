@@ -1,18 +1,19 @@
 use crate::constants::{
-    find_item_by_vals, BasicNothingFunc, Coordinates, DMC1Config, EMPTY_COORDINATES, ITEM_DATA_MAP,
+    find_item_by_vals, BasicNothingFunc, Coordinates, DMC1Config, Difficulty, Rank, EMPTY_COORDINATES,
+    ITEM_DATA_MAP,
 };
 use crate::game_manager::{
-    get_mission, get_room, get_track, ItemData, ARCHIPELAGO_DATA,
+    get_mission, get_room, get_track, with_session_read, ItemData, ARCHIPELAGO_DATA,
 };
-use crate::mapping::{MAPPING};
+use crate::mapping::MAPPING;
 use crate::utilities::{clear_item_slot, get_item_name, DMC1_ADDRESS};
-use crate::{create_hook, hook, location_handler, utilities};
+use crate::{create_hook, hook, location_handler};
 use minhook::MinHook;
 use minhook::MH_STATUS;
 use randomizer_utilities::{read_data_from_address, replace_single_byte};
 use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::{OnceLock};
+use std::sync::OnceLock;
 use tokio::sync::mpsc::Sender;
 
 pub(crate) static TX_LOCATION: OnceLock<Sender<Location>> = OnceLock::new();
@@ -63,23 +64,23 @@ pub fn item_pickup() {
     let pickup_offset: usize = read_data_from_address(data_addr + OFFSET_1);
     let category: u8 = read_data_from_address(pickup_offset + CATEGORY_OFFSET);
     let id: u8 = read_data_from_address(pickup_offset + ID_OFFSET);
-        log::debug!(
-            "Item pickup: Category: {} ID: {} - Item is: {:?}",
-            category,
-            id,
-            find_item_by_vals(id, category)
-        );
-        // Gather location info
-        let received_item = Location {
-            item_id: id,
-            item_category: category,
-            room: get_room(),
-            track: get_track(),
-            mission: get_mission() as u32,
-            coordinates: EMPTY_COORDINATES,
-        };
-        // Send off information
-        send_off_location_coords(received_item, 2);
+    log::debug!(
+        "Item pickup: Category: {} ID: {} - Item is: {:?}",
+        category,
+        id,
+        find_item_by_vals(id, category)
+    );
+    // Gather location info
+    let received_item = Location {
+        item_id: id,
+        item_category: category,
+        room: get_room(),
+        track: get_track(),
+        mission: get_mission() as u32,
+        coordinates: EMPTY_COORDINATES,
+    };
+    // Send off information
+    send_off_location_coords(received_item, 2);
 
     // Figure out which location we are at for replacement purposes
     match location_handler::get_location_name_by_data(&received_item) {
@@ -128,6 +129,12 @@ pub fn setup_check_hooks() -> Result<(), MH_STATUS> {
             ORIGINAL_DISPLAY_ITEMS,
             "???"
         );
+        create_hook!(
+            MISSION_COMPLETE_ADDR,
+            mission_complete,
+            ORIGINAL_MISSION_COMPLETE,
+            "Mission Complete"
+        );
     }
     Ok(())
 }
@@ -162,17 +169,50 @@ pub fn display_inventory() {
         clear_item_slot(&ItemData {
             category,
             id,
-            count: 0
+            count: 0,
         });
         LAST_ID.store(NOTHING, Ordering::Relaxed);
         LAST_CATEGORY.store(NOTHING, Ordering::Relaxed);
     }
     if let Some(func) = ORIGINAL_DISPLAY_ITEMS.get() {
-        unsafe { func(); }
+        unsafe {
+            func();
+        }
     }
 }
 
+// Give Mission Specific Achievements
+// 0x24500 and 0x3e21f0 are called every frame on the mission complete screen
+pub const MISSION_COMPLETE_ADDR: usize = 0x256f20;
+static ORIGINAL_MISSION_COMPLETE: OnceLock<BasicNothingFunc> = OnceLock::new();
+fn mission_complete() {
+    if let Some(func) = ORIGINAL_MISSION_COMPLETE.get() {
+        unsafe {
+            func();
+        }
+    }
+    with_session_read(|session| {
+        log::debug!(
+            "Mission {} Complete - Difficulty: {} - Rank: {}",
+            session.mission,
+            Difficulty::from_repr(session.difficulty as usize).unwrap(),
+            Rank::from_repr(session.rank as usize).unwrap()
+        );
+        send_off_location_coords(
+            Location {
+                item_id: u8::MAX,
+                room: -1,
+                track: -1,
+                mission: session.mission as u32,
+                coordinates: EMPTY_COORDINATES,
+                item_category: 0,
+            },
+            u32::MAX,
+        );
+    })
+    .unwrap();
 
+}
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 1)]
 async fn send_off_location_coords(loc: Location, to_display: u32) {

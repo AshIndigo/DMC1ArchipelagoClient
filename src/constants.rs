@@ -432,11 +432,10 @@ impl GameConfig for DMC1Config {
 pub const MELEE_MAP: LazyLock<BiMap<&str, u8>> = LazyLock::new(|| {
     let mut map = BiMap::new();
     map.insert("Alastor", 0);
-    map.insert("Force Edge", 1);
+    map.insert("Ifrit", 1);
     map.insert("Sparda Air", 2);
     map.insert("Sparda", 3);
     map.insert("Force Edge", 4);
-    // Yamato?
 
     map
 });
@@ -450,3 +449,12 @@ pub const GUN_MAP: LazyLock<BiMap<&str, u8>> = LazyLock::new(|| {
 
     map
 });
+
+#[derive(Copy, Clone, strum_macros::Display, strum_macros::FromRepr)]
+pub(crate) enum Rank {
+    S = 0,
+    A = 1,
+    B = 2,
+    C = 3,
+    D = 4,
+}
