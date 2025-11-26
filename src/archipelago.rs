@@ -361,7 +361,7 @@ fn update_checked_locations() -> Result<(), Box<dyn Error>> {
         .as_ref()
         .ok_or("DataPackageWrapper was None, this is probably not good")?;
 
-    let mut checked_locations = CHECKED_LOCATIONS.write()?;
+    let checked_locations = CHECKED_LOCATIONS.write()?;
     let con_lock = CONNECTED.read()?;
     let con = con_lock.as_ref().ok_or("Connected was None")?;
     let loc_map = dpw
@@ -411,7 +411,6 @@ pub(crate) async fn handle_received_items_packet(
         match ARCHIPELAGO_DATA.write() {
             Ok(mut data) => {
                 *data = game_manager::ArchipelagoData::default();
-                //skill_manager::reset_expertise();
                 for item in &received_items_packet.items {
                     match item.item {
                         5 => {
@@ -476,11 +475,12 @@ pub(crate) async fn handle_received_items_packet(
                         match item.item {
                             5 => {
                                 data.add_blue_orb();
-                                //game_manager::give_hp(constants::ONE_ORB);
+                                // NOTE This fully restored HP, which while not intentional, is a mercy for DMC1
+                                game_manager::ADD_ORB_FUNC(0);
                             }
                             6 => {
                                 data.add_purple_orb();
-                                //game_manager::give_magic(constants::ONE_ORB, &data);
+                                game_manager::ADD_ORB_FUNC(1);
                             }
                             // TODO DT Item
                             // 0x19 => {
@@ -540,6 +540,7 @@ pub(crate) async fn handle_received_items_packet(
                 for item in ALL_ITEMS {
                     if item.name == item_name {
                         archipelago_data.add_item(item.name);
+                        // TODO Yellow Orbs
                     }
                 }
             }

@@ -224,7 +224,7 @@ where
         let o = unsafe {
             std::mem::transmute::<_, ImGuiTextInput>(*EVA_ADDRESS + INPUT_ADDR)(
                 label as *const c_char,
-                ptr as *mut sys::cty::c_char,
+                ptr as *mut cty::c_char,
                 capacity,
                 self.flags.bits() as i32,
                 Some(callback::<T>),

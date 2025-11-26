@@ -1,9 +1,8 @@
-use std::mem::offset_of;
-use crate::game_manager::{with_active_player_data, with_session, ItemData, PlayerData};
+use crate::constants::GAME_NAME;
+use crate::game_manager::{with_session, ItemData};
+use randomizer_utilities::cache::DATA_PACKAGE;
 use randomizer_utilities::get_base_address;
 use std::sync::LazyLock;
-use randomizer_utilities::cache::DATA_PACKAGE;
-use crate::constants::{ALL_ITEMS, GAME_NAME};
 
 pub static DMC1_ADDRESS: LazyLock<usize> = LazyLock::new(|| get_base_address("dmc1.exe"));
 
@@ -42,18 +41,6 @@ pub fn insert_item_into_inv(item_data: &ItemData) {
         item.id = item_data.id;
         item.count = item_data.count;
         s.item_count += 1;
-    }).unwrap();
-}
-
-pub fn give_hp(hp: u8) {
-    with_session(|s| {
-        s.hp += hp;
-    }).unwrap();
-    with_active_player_data(|d| {
-        log::debug!("Max HP found: {:#X}", offset_of!(PlayerData, max_hp));
-        log::debug!("HP found: {:#X}", offset_of!(PlayerData, hp));
-        d.hp += (hp as u16)*100;
-        d.max_hp += (hp as u16)*100;
     }).unwrap();
 }
 

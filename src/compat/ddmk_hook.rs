@@ -209,7 +209,7 @@ unsafe fn archipelago_window(mut custom_item_data: MutexGuard<CustomDataHolder>)
                 let val = custom_item_data.hp_to_give.parse().unwrap_or(0);
                 log::debug!("Modify Health: {}", val);
                 thread::spawn(move || {
-                    utilities::give_hp(val);
+                    //utilities::give_hp(val);
                 });
             }
             if get_imgui_button()(

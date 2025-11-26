@@ -7,7 +7,6 @@ use randomizer_utilities::archipelago_utilities::CONNECTED;
 use randomizer_utilities::mapping_utilities::LocationData;
 use std::sync::{LazyLock, RwLock};
 
-
 pub static MAPPING: LazyLock<RwLock<Option<Mapping>>> = LazyLock::new(|| RwLock::new(None));
 
 fn default_gun() -> String {
@@ -145,7 +144,7 @@ pub struct Mapping {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generated_version: Option<NetworkVersion>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub client_version: Option<NetworkVersion>
+    pub client_version: Option<NetworkVersion>,
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]

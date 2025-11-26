@@ -4,7 +4,8 @@ use crate::utilities::DMC1_ADDRESS;
 use randomizer_utilities::read_data_from_address;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
-use std::sync::{LazyLock, RwLock};
+use std::mem::{transmute};
+use std::sync::{LazyLock, RwLock, RwLockWriteGuard};
 
 #[derive(Debug, Default)]
 pub(crate) struct ArchipelagoData {
@@ -71,8 +72,6 @@ impl ArchipelagoData {
     }
 }
 
-pub(crate) const GAME_SESSION_DATA: usize = 0x5EAB88;
-
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct ItemData {
@@ -136,14 +135,13 @@ pub struct SessionData {
     unknown11: [u8; 55],
     pub(crate) item_count: u8,
     unknown12: [u8; 20],
-    pub(crate) item_data: [ItemData; size_of::<ItemData>() + (976 / size_of::<ItemData>())], // This... does not seem like a good idea (245?
-    //unknown13: [u8; 976],
+    pub(crate) item_data: [ItemData; 245],
     pub(crate) hp: u8,
-    magic: u8,
+    pub(crate) magic: u8,
     unknown14: [u8; 2],
     pub(crate) expertise: [u8; 4], // ?? ?? Ifrit Alastor
-    unknown15: [u8; 8],
-    red_orbs: u32,
+    unknown15: [u8; 8], // TODO Find where yellow orbs are kept
+    pub(crate) red_orbs: u32,
     unknown16: [u8; 4],
     orb_flags: u32,
 }
@@ -153,7 +151,7 @@ pub struct SessionData {
 pub enum SessionError {
     NotUsable, // If a save slot has not been loaded for whatever reason
 }
-
+const GAME_SESSION_DATA: usize = 0x5EAB88;
 static SESSION_PTR: LazyLock<usize> = LazyLock::new(|| *DMC1_ADDRESS + GAME_SESSION_DATA);
 
 pub fn with_session_read<F, R>(f: F) -> Result<R, SessionError>
@@ -232,10 +230,10 @@ pub struct PlayerData {
     unknown6: [u8; 2],
     pub(crate) melee: u8,
     unknown7: u8,
-    magic_human: u16,
-    max_magic_human: u16,
-    magic_demon: u16,
-    max_magic_demon: u16,
+    pub(crate) magic_human: u16,
+    pub(crate) max_magic_human: u16,
+    pub(crate) magic_demon: u16,
+    pub(crate) max_magic_demon: u16,
     unknown8: [u8; 114],
     pub(crate) gun: u8,
     unknown9: [u8; 3],
@@ -250,7 +248,7 @@ pub enum PlayerDataError {
     NotUsable, // Player data is unavailable, chances are this is because we're on the main menu
 }
 
-pub(crate) const PLAYER_DATA: usize = 0x60ACD0;
+const PLAYER_DATA: usize = 0x60ACD0;
 static PLAYER_PTR: LazyLock<usize> = LazyLock::new(|| *DMC1_ADDRESS + PLAYER_DATA);
 
 pub fn with_active_player_data_read<F, R>(f: F) -> Result<R, PlayerDataError>
@@ -346,3 +344,45 @@ pub fn get_room() -> i32 {
 pub fn get_track() -> i32 {
     with_event_data_read(|s| s.track).unwrap() as i32
 }
+
+pub(crate) fn give_hp(blue_orb_count: i32) {
+    if let Err(e) = with_session(|s| {
+        s.hp += blue_orb_count as u8;
+    }) {
+        log::error!("Failed to give hp: {:?}", e);
+    }
+    if let Err(e) = with_active_player_data(|d| {
+        d.hp += blue_orb_count as u16 * 100;
+        d.max_hp += blue_orb_count as u16 * 100;
+    }) {
+        log::error!("Failed to give player hp: {:?}", e);
+    }
+}
+
+pub(crate) fn give_magic(purple_orb_count: i32, data: &RwLockWriteGuard<ArchipelagoData>) {
+    if let Err(e) = with_session(|s| {
+        s.magic += purple_orb_count as u8;
+    }) {
+        log::error!("Failed to give magic: {:?}", e);
+    }
+    if let Err(e) = with_active_player_data(|d| {
+        d.magic_human += purple_orb_count as u16 * 120;
+        d.max_magic_human += purple_orb_count as u16 * 120;
+        d.magic_demon += purple_orb_count as u16 * 200;
+        d.max_magic_demon += purple_orb_count as u16 * 200;
+    }) {
+        log::error!("Failed to give player magic: {:?}", e);
+    }
+}
+
+pub static ADD_ORB_FUNC: LazyLock<extern "C" fn(i32)> = LazyLock::new(|| {
+    unsafe { transmute::<usize, extern "C" fn(i32)>(*DMC1_ADDRESS + 0x3d1760) }
+});
+
+pub static CHANGE_EQUIPPED_GUN: LazyLock<extern "C" fn(u32)> = LazyLock::new(|| {
+    unsafe { transmute::<usize, extern "C" fn(u32)>(*DMC1_ADDRESS + 0x2C4C50) }
+});
+
+pub static CHANGE_EQUIPPED_MELEE: LazyLock<extern "C" fn(u32, u32)> = LazyLock::new(|| {
+    unsafe { transmute::<usize, extern "C" fn(u32, u32)>(*DMC1_ADDRESS + 0x2C99C0) }
+});

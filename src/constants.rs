@@ -2,19 +2,17 @@ use crate::game_manager::ItemData;
 use randomizer_utilities::mapping_utilities::GameConfig;
 use std::collections::HashMap;
 use std::sync::LazyLock;
+use bimap::BiMap;
 
 pub type BasicNothingFunc = unsafe extern "system" fn();
 
-// TODO Don't know if these are correct, just assuming for now.
-pub const MAX_HP: f32 = 20000.0;
-pub const INITIAL_HP: f32 = 6000.0;
-pub const MAX_MAGIC: f32 = 10000.0;
-pub const INITIAL_MAGIC: f32 = 0.0;
+pub const MAX_HP: u8 = 30;
+pub const INITIAL_HP: u8 = 10; // 15 for easy
+pub const MAX_MAGIC: u8 = 10;
+pub const INITIAL_MAGIC: u8 = 0; // 3 Normal and up, 6 on easy
 
-// TODO Need to establish what I'm going to use for remote's. One of the unused sign's could be fun?
-pub(crate) const DUMMY_ID: LazyLock<u32> = LazyLock::new(|| 5);//*ITEM_ID_MAP.get("Dummy").unwrap());
 
-pub(crate) const REMOTE_ID: LazyLock<u32> = LazyLock::new(|| 6);//*ITEM_ID_MAP.get("Remote").unwrap());
+pub(crate) const REMOTE_ID: LazyLock<u32> = LazyLock::new(|| 100);
 #[derive(Debug)]
 pub struct Item {
     pub id: u8,
@@ -285,7 +283,7 @@ pub(crate) const ALL_ITEMS: [Item; 43] = [
     },
     Item {
         id: 4,
-        name: "Sign of Perseverance", // Unused
+        name: "Remote", // Unused, Sign of Perseverance
         category: 5,
         mission: None,
         group: ItemCategory::Key
@@ -327,7 +325,7 @@ pub(crate) const ALL_ITEMS: [Item; 43] = [
     },
     Item {
         id: 2,
-        name: "Philosopher's Elixir",
+        name: "Elixir", // Tracks will mess up how this
         category: 6,
         mission: Some(19),
         group: ItemCategory::Key
@@ -364,7 +362,6 @@ pub fn find_item_by_data(data: &ItemData) -> Option<&'static str> {
 }
 
 pub fn find_item_by_vals(id: u8, category: u8) -> Option<&'static str> {
-    log::debug!("find_item_by_vals: {:?}", ALL_ITEMS.iter().filter(|i| i.id == id && i.category == category).collect::<Vec<_>>());
     let results: Vec<_> = ALL_ITEMS.iter().filter(|i| i.id == id && i.category == category).collect();
     if results.is_empty() {
         None
@@ -431,3 +428,25 @@ impl GameConfig for DMC1Config {
     const REMOTE_ID: u32 = 0x35;
     const GAME_NAME: &'static str = GAME_NAME;
 }
+
+pub const MELEE_MAP: LazyLock<BiMap<&str, u8>> = LazyLock::new(|| {
+    let mut map = BiMap::new();
+    map.insert("Alastor", 0);
+    map.insert("Force Edge", 1);
+    map.insert("Sparda Air", 2);
+    map.insert("Sparda", 3);
+    map.insert("Force Edge", 4);
+    // Yamato?
+
+    map
+});
+pub const GUN_MAP: LazyLock<BiMap<&str, u8>> = LazyLock::new(|| {
+    let mut map = BiMap::new();
+    map.insert("Handgun", 1);
+    map.insert("Shotgun", 2);
+    map.insert("Grenade Launcher", 3);
+    map.insert("Nightmare Beta", 4);
+    map.insert("Needlegun", 5);
+
+    map
+});
