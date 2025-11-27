@@ -3,7 +3,7 @@ use crate::check_handler::Location;
 use crate::connection_manager::{CONNECTION_STATUS};
 use crate::constants::*;
 use crate::game_manager::{get_mission, ARCHIPELAGO_DATA};
-use crate::mapping::{Goal, Mapping, MAPPING};
+use crate::mapping::{DeathlinkSetting, Goal, Mapping, MAPPING};
 use crate::utilities::get_item_name;
 use crate::{bank, game_manager, hook, location_handler, mapping, skill_manager, utilities};
 use anyhow::anyhow;
@@ -12,7 +12,7 @@ use archipelago_rs::protocol::{
     Bounced, ClientMessage, ClientStatus, ReceivedItems, Retrieved, ServerMessage,
     StatusUpdate,
 };
-use randomizer_utilities::archipelago_utilities::{handle_print_json, send_deathlink_message, DeathLinkData, CHECKED_LOCATIONS, CONNECTED, SLOT_NUMBER, TEAM_NUMBER};
+use randomizer_utilities::archipelago_utilities::{handle_print_json, send_deathlink_message, DeathLinkData, CHECKED_LOCATIONS, CONNECTED, DEATH_LINK, SLOT_NUMBER, TEAM_NUMBER};
 use randomizer_utilities::cache::{read_cache, DATA_PACKAGE};
 use randomizer_utilities::item_sync::{get_index, RoomSyncInfo, CURRENT_INDEX};
 use randomizer_utilities::ui_utilities::Status;
@@ -20,6 +20,7 @@ use randomizer_utilities::{cache, item_sync};
 use std::error::Error;
 use std::sync::atomic::Ordering;
 use std::sync::OnceLock;
+use std::time::Duration;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 pub static TX_DEATHLINK: OnceLock<Sender<DeathLinkData>> = OnceLock::new();
@@ -285,7 +286,41 @@ async fn handle_bounced(
     bounced: Bounced,
     client: &mut ArchipelagoClient,
 ) -> Result<(), Box<dyn Error>> {
-    // TODO DL Support
+    if bounced.tags.is_some() {
+        if bounced.tags.unwrap().contains(&DEATH_LINK.to_string()) {
+            log::debug!("DeathLink detected");
+            // TODO Overlay System - Only display this if in game?
+            // if bounced.data.is_some() {
+            //     overlay::add_message(OverlayMessage::new(
+            //         vec![MessageSegment::new(
+            //             bounced
+            //                 .data
+            //                 .unwrap()
+            //                 .get("cause")
+            //                 .unwrap()
+            //                 .as_str()
+            //                 .unwrap()
+            //                 .to_string(),
+            //             WHITE,
+            //         )],
+            //         Duration::from_secs(3),
+            //         // TODO May want to adjust position, currently added to the 'notification list' so it's in the upper right queue
+            //         0.0,
+            //         0.0,
+            //         MessageType::Notification,
+            //     ));
+            // }
+            match MAPPING.read()?.as_ref().unwrap().death_link {
+                DeathlinkSetting::DeathLink => {
+                    game_manager::kill_dante();
+                }
+                DeathlinkSetting::HurtLink => {
+                    game_manager::hurt_dante();
+                }
+                DeathlinkSetting::Off => {}
+            }
+        }
+    }
     Ok(())
 }
 

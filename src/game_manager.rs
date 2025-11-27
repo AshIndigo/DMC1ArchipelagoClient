@@ -377,6 +377,24 @@ pub(crate) fn give_magic(purple_orb_count: i32, data: &RwLockWriteGuard<Archipel
     }
 }
 
+pub(crate) fn hurt_dante() {
+    let damage_fraction: u16 = match get_difficulty() {
+        Difficulty::Easy => (1.0 / 4.0) as u16,
+        Difficulty::Normal => (1.0 / 3.0) as u16,
+        Difficulty::Hard => (1.0 / 2.0) as u16,
+        Difficulty::DanteMustDie => (5.0 / 6.0) as u16,
+    };
+    with_active_player_data(|d| {
+        d.hp = u16::max(d.hp - (d.max_hp * damage_fraction), 0);
+    }).unwrap();
+}
+
+pub(crate) fn kill_dante() {
+    with_active_player_data(|d| {
+        d.hp = 0;
+    }).unwrap();
+}
+
 pub static ADD_ORB_FUNC: LazyLock<extern "C" fn(i32)> = LazyLock::new(|| {
     unsafe { transmute::<usize, extern "C" fn(i32)>(*DMC1_ADDRESS + 0x3d1760) }
 });

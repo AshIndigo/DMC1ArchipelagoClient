@@ -10,12 +10,11 @@ use crate::game_manager::{
 };
 use crate::mapping::MAPPING;
 use crate::utilities::DMC1_ADDRESS;
-use crate::{
-    check_handler, constants, create_hook, skill_manager, utilities,
-};
+use crate::{check_handler, constants, create_hook, save_handler, skill_manager, utilities};
 use minhook::{MinHook, MH_STATUS};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
+use crate::save_handler::setup_save_hooks;
 
 static HOOKS_CREATED: AtomicBool = AtomicBool::new(false);
 
@@ -37,6 +36,7 @@ pub(crate) fn install_initial_functions() {
 
 unsafe fn create_hooks() -> Result<(), MH_STATUS> {
     setup_check_hooks()?;
+    setup_save_hooks()?;
     unsafe {
         create_hook!(
             LOAD_ROOM_ADDR,
@@ -62,6 +62,8 @@ fn enable_hooks() {
         check_handler::DISPLAY_ITEMS_ADDR,
         SETUP_NEW_SESSION_ADDR,
         check_handler::MISSION_COMPLETE_ADDR,
+        save_handler::SAVE_GAME_ADDR,
+        save_handler::LOAD_GAME_ADDR,
     ];
     addresses.iter().for_each(|addr| unsafe {
         match MinHook::enable_hook((*DMC1_ADDRESS + addr) as *mut _) {

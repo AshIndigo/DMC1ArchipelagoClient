@@ -28,6 +28,7 @@ mod bank;
 mod text_handler;
 mod location_handler;
 mod data;
+mod save_handler;
 
 #[macro_export]
 /// Does not enable the hook, that needs to be done separately

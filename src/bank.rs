@@ -1,7 +1,6 @@
 use crate::constants::ItemCategory;
 use archipelago_rs::client::{ArchipelagoClient, ArchipelagoError};
 use archipelago_rs::protocol::{ClientMessage, DataStorageOperation, Get, Set};
-use minhook::{MinHook, MH_STATUS};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
