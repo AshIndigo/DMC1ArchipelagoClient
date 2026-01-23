@@ -1,6 +1,4 @@
-use crate::constants::GAME_NAME;
-use crate::game_manager::{with_session, ItemData};
-use randomizer_utilities::cache::DATA_PACKAGE;
+use crate::game_manager::{ItemData, with_session};
 use randomizer_utilities::get_base_address;
 use std::sync::LazyLock;
 
@@ -24,7 +22,8 @@ pub fn insert_unique_item_into_inv(item_data: &ItemData) {
         item.id = item_data.id;
         item.count = item_data.count;
         s.item_count += 1;
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 pub fn insert_item_into_inv(item_data: &ItemData) {
@@ -41,7 +40,8 @@ pub fn insert_item_into_inv(item_data: &ItemData) {
         item.id = item_data.id;
         item.count = item_data.count;
         s.item_count += 1;
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 pub(crate) fn clear_item_slot(item_data: &ItemData) {
@@ -50,22 +50,11 @@ pub(crate) fn clear_item_slot(item_data: &ItemData) {
             let item = &mut s.item_data[i as usize];
             if item == item_data {
                 // Swap in last element
-                s.item_data[i as usize] = s.item_data[(s.item_count-1) as usize];
+                s.item_data[i as usize] = s.item_data[(s.item_count - 1) as usize];
                 s.item_count -= 1;
                 return;
             }
         }
-    }).unwrap();
-}
-
-pub fn get_item_name(id: i64) -> Option<String> {
-    if let Some(cache) = DATA_PACKAGE.read().unwrap().as_ref() {
-        return match cache.item_id_to_name.get(GAME_NAME) {
-            None => None,
-            Some(map) => {
-                map.get(&id).cloned()
-            }
-        }
-    }
-    None
+    })
+    .unwrap();
 }

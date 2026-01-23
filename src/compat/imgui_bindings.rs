@@ -1,9 +1,9 @@
 use crate::compat::ddmk_hook::EVA_ADDRESS;
+use crate::compat::inputs;
 use crate::constants::BasicNothingFunc;
-use imgui_sys::{cty, ImGuiCond, ImGuiWindowFlags, ImVec2};
+use imgui_sys::{ImGuiCond, ImGuiWindowFlags, ImVec2, cty};
 use std::os::raw::c_char;
 use std::sync::OnceLock;
-use crate::compat::inputs;
 
 pub type ImGuiBegin =
     extern "C" fn(name: *const cty::c_char, p_open: *mut bool, flags: ImGuiWindowFlags) -> bool;
@@ -20,9 +20,8 @@ pub const TEXT_ADDR: usize = 0x4c8b0;
 
 pub const NEXT_POS_FUNC_ADDR: usize = 0x208f0;
 
-pub fn input_rs<T: AsRef<str>>(label: T, buf: &mut String,) {
-    inputs::InputText::new(label, buf)
-        .build();
+pub fn input_rs<T: AsRef<str>>(label: T, buf: &mut String) {
+    inputs::InputText::new(label, buf).build();
 }
 
 pub fn text<T: AsRef<str>>(text: T) {

@@ -1,25 +1,33 @@
 use crate::constants::{
-    find_item_by_vals, BasicNothingFunc, Coordinates, DMC1Config, Difficulty, Rank, EMPTY_COORDINATES,
-    ITEM_DATA_MAP,
+    BasicNothingFunc, Coordinates, Difficulty, EMPTY_COORDINATES, ITEM_DATA_MAP, Rank,
+    find_item_by_vals,
 };
-use crate::game_manager::{
-    get_mission, get_room, get_track, with_session_read, ItemData, ARCHIPELAGO_DATA,
-};
-use crate::mapping::MAPPING;
-use crate::utilities::{clear_item_slot, get_item_name, DMC1_ADDRESS};
+use crate::game_manager::{ItemData, get_mission, get_room, get_track, with_session_read};
+use crate::mapping::CACHED_LOCATIONS;
+use crate::utilities::{DMC1_ADDRESS, clear_item_slot};
 use crate::{create_hook, hook, location_handler};
-use minhook::MinHook;
 use minhook::MH_STATUS;
+use minhook::MinHook;
 use randomizer_utilities::{read_data_from_address, replace_single_byte};
 use std::fmt::{Display, Formatter};
-use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::OnceLock;
-use tokio::sync::mpsc::Sender;
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::mpsc::Sender;
 
 pub(crate) static TX_LOCATION: OnceLock<Sender<Location>> = OnceLock::new();
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum LocationType {
+    Standard,
+    MissionComplete,
+    SSRank,
+    PurchaseItem,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Location {
-    pub(crate) item_id: u8,
+    pub(crate) location_type: LocationType,
+    pub(crate) item_id: u32,
     pub(crate) room: i32,
     pub(crate) track: i32,
     pub(crate) mission: u32,
@@ -65,14 +73,18 @@ pub fn item_pickup() {
     let category: u8 = read_data_from_address(pickup_offset + CATEGORY_OFFSET);
     let id: u8 = read_data_from_address(pickup_offset + ID_OFFSET);
     log::debug!(
-        "Item pickup: Category: {} ID: {} - Item is: {:?}",
+        "Item pickup: Category: {} ID: {} - Item is: {:?}\nMission: {}, Room: {}, Track: {}",
         category,
         id,
-        find_item_by_vals(id, category)
+        find_item_by_vals(id, category),
+        get_mission(),
+        get_room(),
+        get_track()
     );
     // Gather location info
     let received_item = Location {
-        item_id: id,
+        location_type: LocationType::Standard,
+        item_id: id as u32,
         item_category: category,
         room: get_room(),
         track: get_track(),
@@ -85,17 +97,19 @@ pub fn item_pickup() {
     // Figure out which location we are at for replacement purposes
     match location_handler::get_location_name_by_data(&received_item) {
         Ok(loc_key) => {
-            if let Some(mappings) = MAPPING.read().unwrap().as_ref() {
-                // Get the AP item data for that location
-                let location_data = mappings.items.get(loc_key).unwrap();
-                let item_name =
-                    get_item_name(location_data.get_in_game_id::<DMC1Config>() as i64).unwrap();
-                log::debug!("Actual item name is {item_name}");
-                let data = ITEM_DATA_MAP.get(&item_name.as_str()).unwrap();
-                unsafe {
-                    replace_single_byte(pickup_offset + ID_OFFSET, data.id);
-                    replace_single_byte(pickup_offset + CATEGORY_OFFSET, data.category);
-                }
+            // Get the AP item data for that location
+            let item_name = CACHED_LOCATIONS
+                .read()
+                .unwrap()
+                .get(loc_key)
+                .unwrap()
+                .item()
+                .name();
+            log::debug!("Actual item name is {item_name}");
+            let data = ITEM_DATA_MAP.get(&item_name.as_str()).unwrap();
+            unsafe {
+                replace_single_byte(pickup_offset + ID_OFFSET, data.id);
+                replace_single_byte(pickup_offset + CATEGORY_OFFSET, data.category);
             }
         }
         Err(err) => {
@@ -137,6 +151,18 @@ pub fn setup_check_hooks() -> Result<(), MH_STATUS> {
         );
     }
     Ok(())
+}
+
+pub(crate) fn add_hooks_to_list(addrs: &mut Vec<usize>) {
+    const ADDRESSES: [usize; 4] = [
+        ITEM_PICKUP_ADDR,
+        ADD_ITEM_ADDR,
+        DISPLAY_ITEMS_ADDR,
+        MISSION_COMPLETE_ADDR,
+    ];
+    for a in ADDRESSES.iter() {
+        addrs.push(*a);
+    }
 }
 
 pub(crate) const ADD_ITEM_ADDR: usize = 0x3d78d0;
@@ -200,7 +226,8 @@ fn mission_complete() {
         );
         send_off_location_coords(
             Location {
-                item_id: u8::MAX,
+                location_type: LocationType::MissionComplete,
+                item_id: u32::MAX,
                 room: -1,
                 track: -1,
                 mission: session.mission as u32,
@@ -211,13 +238,11 @@ fn mission_complete() {
         );
     })
     .unwrap();
-
 }
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 1)]
-async fn send_off_location_coords(loc: Location, to_display: u32) {
+fn send_off_location_coords(loc: Location, to_display: u32) {
     if let Some(tx) = TX_LOCATION.get() {
-        tx.send(loc).await.expect("Failed to send Location!");
+        tx.send(loc).expect("Failed to send Location!");
         if to_display != u32::MAX {
             // clear_high_roller();
             // text_handler::LAST_OBTAINED_ID.store(to_display as u8, SeqCst);

@@ -1,5 +1,5 @@
-use crate::game_manager::ArchipelagoData;
 use crate::game_manager;
+use crate::game_manager::ArchipelagoData;
 use std::collections::HashMap;
 use std::ops::BitOrAssign;
 
@@ -19,79 +19,123 @@ pub static ID_SKILL_MAP: LazyLock<HashMap<usize, &'static str>> = LazyLock::new(
     map
 });
 
-static SKILLS_MAP: LazyLock<HashMap<&str, SkillData>> = LazyLock::new(|| HashMap::from([
-    ("Alastor - Stinger Level 1", SkillData {
-        id: 100,
-        index: 3,
-        flag: 16,
-    }),
-    ("Alastor - Stinger Level 2", SkillData {
-        id: 101,
-        index: 3,
-        flag: 8,
-    }),
-    ("Alastor - Round Trip", SkillData {
-        id: 102,
-        index: 3,
-        flag: 32,
-    }),
-    ("Alastor - Air Hike", SkillData {
-        id: 103,
-        index: 3,
-        flag: 64,
-    }),
-    ("Alastor - Air Raid", SkillData {
-        id: 104,
-        index: 3,
-        flag: 1,
-    }),
-    ("Alastor - Vortex Level 1", SkillData {
-        id: 105,
-        index: 3,
-        flag: 4,
-    }),
-    ("Alastor - Vortex Level 2", SkillData {
-        id: 106,
-        index: 3,
-        flag: 2,
-    }),
-    ("Ifrit - Rolling Blaze", SkillData {
-        id: 107,
-        index: 2,
-        flag: 128,
-    }),
-    ("Ifrit - Magma Drive", SkillData {
-        id: 108,
-        index: 2,
-        flag: 64,
-    }),
-    ("Ifrit - Kick 13 Level 1", SkillData {
-        id: 109,
-        index: 2,
-        flag: 32,
-    }),
-    ("Ifrit - Kick 13 Level 2", SkillData {
-        id: 110,
-        index: 2,
-        flag: 16,
-    }),
-    ("Ifrit - Meteor Level 1", SkillData {
-        id: 111,
-        index: 2,
-        flag: 8,
-    }),
-    ("Ifrit - Meteor Level 2", SkillData {
-        id: 112,
-        index: 2,
-        flag: 4,
-    }),
-    ("Ifrit - Inferno", SkillData {
-        id: 113,
-        index: 2,
-        flag: 2,
-    }),
-]));
-static DEFAULT_SKILLS: [u8; 4] = [0x0, 0x0, 0x0, 0x0];  // I should see what else this lets me control...
+static SKILLS_MAP: LazyLock<HashMap<&str, SkillData>> = LazyLock::new(|| {
+    HashMap::from([
+        (
+            "Alastor - Stinger Level 1",
+            SkillData {
+                id: 100,
+                index: 3,
+                flag: 16,
+            },
+        ),
+        (
+            "Alastor - Stinger Level 2",
+            SkillData {
+                id: 101,
+                index: 3,
+                flag: 8,
+            },
+        ),
+        (
+            "Alastor - Round Trip",
+            SkillData {
+                id: 102,
+                index: 3,
+                flag: 32,
+            },
+        ),
+        (
+            "Alastor - Air Hike",
+            SkillData {
+                id: 103,
+                index: 3,
+                flag: 64,
+            },
+        ),
+        (
+            "Alastor - Air Raid",
+            SkillData {
+                id: 104,
+                index: 3,
+                flag: 1,
+            },
+        ),
+        (
+            "Alastor - Vortex Level 1",
+            SkillData {
+                id: 105,
+                index: 3,
+                flag: 4,
+            },
+        ),
+        (
+            "Alastor - Vortex Level 2",
+            SkillData {
+                id: 106,
+                index: 3,
+                flag: 2,
+            },
+        ),
+        (
+            "Ifrit - Rolling Blaze",
+            SkillData {
+                id: 107,
+                index: 2,
+                flag: 128,
+            },
+        ),
+        (
+            "Ifrit - Magma Drive",
+            SkillData {
+                id: 108,
+                index: 2,
+                flag: 64,
+            },
+        ),
+        (
+            "Ifrit - Kick 13 Level 1",
+            SkillData {
+                id: 109,
+                index: 2,
+                flag: 32,
+            },
+        ),
+        (
+            "Ifrit - Kick 13 Level 2",
+            SkillData {
+                id: 110,
+                index: 2,
+                flag: 16,
+            },
+        ),
+        (
+            "Ifrit - Meteor Level 1",
+            SkillData {
+                id: 111,
+                index: 2,
+                flag: 8,
+            },
+        ),
+        (
+            "Ifrit - Meteor Level 2",
+            SkillData {
+                id: 112,
+                index: 2,
+                flag: 4,
+            },
+        ),
+        (
+            "Ifrit - Inferno",
+            SkillData {
+                id: 113,
+                index: 2,
+                flag: 2,
+            },
+        ),
+    ])
+});
+static DEFAULT_SKILLS: [u8; 4] = [0x0, 0x0, 0x0, 0x0]; // I should see what else this lets me control...
 
 pub(crate) fn reset_expertise() {
     match game_manager::with_session(|s| {

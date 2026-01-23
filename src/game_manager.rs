@@ -4,7 +4,7 @@ use crate::utilities::DMC1_ADDRESS;
 use randomizer_utilities::read_data_from_address;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
-use std::mem::{transmute};
+use std::mem::transmute;
 use std::sync::{LazyLock, RwLock, RwLockWriteGuard};
 
 #[derive(Debug, Default)]
@@ -16,7 +16,7 @@ pub(crate) struct ArchipelagoData {
     pub(crate) vortex_level: u8,
     pub(crate) kick_13_level: u8,
     pub(crate) meteor_level: u8,
-    pub(crate) items: HashSet<&'static str>,
+    pub(crate) items: HashSet<String>,
     pub(crate) skills: HashSet<&'static str>,
 }
 
@@ -24,7 +24,7 @@ pub static ARCHIPELAGO_DATA: LazyLock<RwLock<ArchipelagoData>> =
     LazyLock::new(|| RwLock::new(ArchipelagoData::default()));
 
 impl ArchipelagoData {
-    pub fn add_item(&mut self, item: &'static str) {
+    pub fn add_item(&mut self, item: String) {
         self.items.insert(item);
     }
 
@@ -38,10 +38,11 @@ impl ArchipelagoData {
 
     pub(crate) fn add_purple_orb(&mut self) {
         self.purple_orbs = (self.purple_orbs + 1).min(10);
-        if let Some(mappings) = MAPPING.read().unwrap().as_ref() {
-            if !mappings.devil_trigger_mode {
-                self.dt_unlocked = true;
-            }
+
+        if let Some(mappings) = MAPPING.read().unwrap().as_ref()
+            && !mappings.devil_trigger_mode
+        {
+            self.dt_unlocked = true;
         }
     }
 
@@ -142,7 +143,7 @@ pub struct SessionData {
     pub(crate) magic: u8,
     unknown14: [u8; 2],
     pub(crate) expertise: [u8; 4], // ?? ?? Ifrit Alastor
-    unknown15: [u8; 8], // TODO Find where yellow orbs are kept
+    unknown15: [u8; 8],            // TODO Find where yellow orbs are kept
     pub(crate) red_orbs: u32,
     unknown16: [u8; 4],
     orb_flags: u32,
@@ -167,7 +168,7 @@ where
             return Err(SessionError::NotUsable);
         }
         let s = &*(ptr_to_data);
-        if !session_is_valid(s) {
+        if !session_is_valid() {
             return Err(SessionError::NotUsable);
         }
         Ok(f(s))
@@ -185,15 +186,15 @@ where
             return Err(SessionError::NotUsable);
         }
         let s = &mut *(ptr_to_data);
-        if !session_is_valid(s) {
+        if !session_is_valid() {
             return Err(SessionError::NotUsable);
         }
         Ok(f(s))
     }
 }
 
-fn session_is_valid(_s: &SessionData) -> bool {
-    true
+pub(crate) fn session_is_valid() -> bool {
+    read_data_from_address::<usize>(*SESSION_PTR) != 0
 }
 
 /// Get current mission
@@ -386,23 +387,23 @@ pub(crate) fn hurt_dante() {
     };
     with_active_player_data(|d| {
         d.hp = u16::max(d.hp - (d.max_hp * damage_fraction), 0);
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 pub(crate) fn kill_dante() {
     with_active_player_data(|d| {
         d.hp = 0;
-    }).unwrap();
+    })
+    .unwrap();
 }
 
-pub static ADD_ORB_FUNC: LazyLock<extern "C" fn(i32)> = LazyLock::new(|| {
-    unsafe { transmute::<usize, extern "C" fn(i32)>(*DMC1_ADDRESS + 0x3d1760) }
-});
+pub static ADD_ORB_FUNC: LazyLock<extern "C" fn(i32)> =
+    LazyLock::new(|| unsafe { transmute::<usize, extern "C" fn(i32)>(*DMC1_ADDRESS + 0x3d1760) });
 
-pub static CHANGE_EQUIPPED_GUN: LazyLock<extern "C" fn(u32)> = LazyLock::new(|| {
-    unsafe { transmute::<usize, extern "C" fn(u32)>(*DMC1_ADDRESS + 0x2C4C50) }
-});
+pub static CHANGE_EQUIPPED_GUN: LazyLock<extern "C" fn(u32)> =
+    LazyLock::new(|| unsafe { transmute::<usize, extern "C" fn(u32)>(*DMC1_ADDRESS + 0x2C4C50) });
 
-pub static CHANGE_EQUIPPED_MELEE: LazyLock<extern "C" fn(u32, u32)> = LazyLock::new(|| {
-    unsafe { transmute::<usize, extern "C" fn(u32, u32)>(*DMC1_ADDRESS + 0x2C99C0) }
+pub static CHANGE_EQUIPPED_MELEE: LazyLock<extern "C" fn(u32, u32)> = LazyLock::new(|| unsafe {
+    transmute::<usize, extern "C" fn(u32, u32)>(*DMC1_ADDRESS + 0x2C99C0)
 });

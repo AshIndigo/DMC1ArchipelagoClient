@@ -1,8 +1,8 @@
-use imgui::{sys, HistoryDirection, InputTextCallback, InputTextFlags};
+use crate::compat::ddmk_hook::EVA_ADDRESS;
+use imgui::{HistoryDirection, InputTextCallback, InputTextFlags, sys};
+use imgui_sys::{ImGuiInputTextCallback, ImGuiInputTextFlags, cty};
 use std::ops::Range;
 use std::os::raw::{c_char, c_int, c_void};
-use imgui_sys::{cty, ImGuiInputTextCallback, ImGuiInputTextFlags};
-use crate::compat::ddmk_hook::EVA_ADDRESS;
 pub type ImGuiTextInput = extern "C" fn(
     label: *const cty::c_char,
     buf: *mut cty::c_char,
@@ -275,7 +275,7 @@ impl TextCallbackData {
                 (*(self.0)).Buf as *const _,
                 (*(self.0)).BufTextLen as usize,
             ))
-                .expect("internal imgui error -- it boofed a utf8")
+            .expect("internal imgui error -- it boofed a utf8")
         }
     }
 
@@ -304,7 +304,7 @@ impl TextCallbackData {
                 (*(self.0)).Buf as *const _ as *mut _,
                 (*(self.0)).BufTextLen as usize,
             ))
-                .expect("internal imgui error -- it boofed a utf8");
+            .expect("internal imgui error -- it boofed a utf8");
 
             str.as_bytes_mut()
         }
@@ -342,11 +342,7 @@ impl TextCallbackData {
         // Avoid returning a range with start > end, which would be problematic. For example, it
         // would cause panics when used to index the string buffer and would also cause Self::has_selection
         // to return a false negative.
-        if start < end {
-            start..end
-        } else {
-            end..start
-        }
+        if start < end { start..end } else { end..start }
     }
 
     /// Returns the selected text directly. Note that if no text is selected,
@@ -526,7 +522,6 @@ pub trait InputTextCallbackHandler {
     /// [InputTextMultilineCallback::ALWAYS].
     fn on_always(&mut self, _: TextCallbackData) {}
 }
-
 
 extern "C" fn callback<T: InputTextCallbackHandler>(
     data: *mut sys::ImGuiInputTextCallbackData,

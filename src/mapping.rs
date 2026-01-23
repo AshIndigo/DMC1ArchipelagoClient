@@ -1,11 +1,21 @@
+use crate::data::generated_locations;
+use archipelago_rs::{Client, CreateAsHint, Error, LocatedItem, Location};
+use oneshot::Receiver;
+use randomizer_utilities::APVersion;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-
-use archipelago_rs::protocol::NetworkVersion;
-use randomizer_utilities::archipelago_utilities::CONNECTED;
-use randomizer_utilities::mapping_utilities::LocationData;
 use std::sync::{LazyLock, RwLock};
+use std::thread;
+
+pub static OVERLAY_INFO: LazyLock<RwLock<OverlayInfo>> =
+    LazyLock::new(|| RwLock::new(OverlayInfo::default()));
+
+#[derive(Debug, Default)]
+pub struct OverlayInfo {
+    pub client_version: Option<APVersion>,
+    pub generated_version: Option<APVersion>,
+}
 
 pub static MAPPING: LazyLock<RwLock<Option<Mapping>>> = LazyLock::new(|| RwLock::new(None));
 
@@ -119,11 +129,9 @@ where
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Mapping {
     // For mapping JSON
-    pub seed: String,
-    pub items: HashMap<String, LocationData>,
     pub starter_items: Vec<String>,
     #[serde(default = "default_melee")]
     #[serde(deserialize_with = "parse_melee_number")]
@@ -139,15 +147,12 @@ pub struct Mapping {
     #[serde(default = "default_goal")]
     #[serde(deserialize_with = "parse_goal")]
     pub goal: Goal,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub mission_order: Option<Vec<u8>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub generated_version: Option<NetworkVersion>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub client_version: Option<NetworkVersion>,
+    pub generated_version: Option<APVersion>,
+    pub client_version: Option<APVersion>,
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub enum Goal {
     /// Beat M20 in linear order M1-M20 (Default)
     Standard,
@@ -157,25 +162,64 @@ pub enum Goal {
     RandomOrder,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub enum DeathlinkSetting {
     DeathLink, // Normal DeathLink Behavior
     HurtLink,  // Sends out DeathLink messages when you die. But only hurts you if you receive one
     Off,       // Don't send/receive DL related messages
 }
 
-pub(crate) fn parse_slot_data() -> Result<(), Box<dyn std::error::Error>> {
-    match CONNECTED.read() {
-        Ok(conn_opt) => {
-            if let Some(connected) = conn_opt.as_ref() {
-                MAPPING.write()?.replace(serde_path_to_error::deserialize(
-                    connected.slot_data.clone(),
-                )?);
-                Ok(())
-            } else {
-                Err("No mapping found, cannot parse".into())
-            }
+pub static CACHED_LOCATIONS: LazyLock<RwLock<HashMap<String, LocatedItem>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+pub fn run_scouts_for_mission(client: &mut Client<Mapping>, mission: u32, hint: CreateAsHint) {
+    run_scouts(client.scout_locations(get_locations_by_mission(client, mission), hint));
+}
+pub fn run_scouts_for_secret_mission(client: &mut Client<Mapping>) {
+    run_scouts(client.scout_locations(get_secret_missions(client), CreateAsHint::No));
+}
+
+fn run_scouts(future: Receiver<Result<Vec<LocatedItem>, Error>>) {
+    thread::spawn(|| match future.recv() {
+        Ok(scouted) => {
+            parse_scouts(scouted);
         }
-        Err(err) => Err(err.into()),
+        Err(err) => log::error!("Failed to run Scouts for: {}", err),
+    });
+}
+
+pub fn parse_scouts(res: Result<Vec<LocatedItem>, Error>) {
+    match res {
+        Ok(items) => match CACHED_LOCATIONS.write() {
+            Ok(mut cached_locations) => {
+                for item in items {
+                    cached_locations.insert(item.location().name().to_string(), item);
+                }
+            }
+            Err(err) => {
+                log::error!("Unable to write to location cache: {}", err)
+            }
+        },
+        Err(err) => {
+            log::error!("Failed to scout: {}", err);
+        }
     }
+}
+
+pub fn get_locations_by_mission(client: &Client<Mapping>, mission: u32) -> Vec<Location> {
+    let current_game = client.this_game();
+    generated_locations::ITEM_MISSION_MAP
+        .iter()
+        .filter(|(_k, v)| v.mission == mission)
+        .filter_map(|(k, _v)| current_game.location_by_name(*k))
+        .collect()
+}
+
+pub fn get_secret_missions(client: &Client<Mapping>) -> Vec<Location> {
+    let current_game = client.this_game();
+    generated_locations::ITEM_MISSION_MAP
+        .iter()
+        .filter(|(k, _v)| k.contains("Secret Mission"))
+        .filter_map(|(k, _v)| current_game.location_by_name(*k))
+        .collect()
 }
