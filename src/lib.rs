@@ -5,12 +5,10 @@ use archipelago_rs::{Connection, ConnectionOptions, ItemHandling};
 use minhook::{MH_STATUS, MinHook};
 use randomizer_utilities::exception_handler;
 use randomizer_utilities::mapping_utilities::GameConfig;
-use std::fmt::{Display, Formatter};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
-use windows::Win32::Foundation::{FARPROC, HINSTANCE};
-use windows::Win32::System::LibraryLoader;
-use windows::core::{BOOL, PCSTR};
+use windows::Win32::Foundation::HINSTANCE;
+use windows::core::BOOL;
 
 mod archipelago;
 mod check_handler;
@@ -40,26 +38,6 @@ macro_rules! create_hook {
     }};
 }
 
-#[derive(Debug)]
-#[repr(C)]
-pub(crate) struct LoaderStatus {
-    // DMC3
-    pub dmc3_hash_error: bool,
-    pub crimson_hash_error: bool,
-    pub ddmk_dmc3_hash_error: bool,
-    // DMC1
-    pub dmc1_hash_error: bool,
-    pub ddmk_dmc1_hash_error: bool,
-}
-
-impl Display for LoaderStatus {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-type GetStatusFn = unsafe extern "C" fn() -> *const LoaderStatus;
-
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
 pub extern "system" fn DllMain(
@@ -77,18 +55,7 @@ pub extern "system" fn DllMain(
             //ui::dx11_hooks::setup_overlay();
             randomizer_utilities::setup_logger("dmc1_randomizer");
             // Loader status
-            thread::spawn(|| unsafe {
-                let loader_hmodule = LibraryLoader::LoadLibraryA(PCSTR::from_raw(
-                    c"dinput8.dll".as_ptr() as *const u8,
-                ));
-                let proc_addr = LibraryLoader::GetProcAddress(
-                    loader_hmodule.unwrap(),
-                    PCSTR::from_raw(c"get_loader_status".as_ptr() as *const u8),
-                );
-                // TODO Make this display on the overlay
-                let loader_status = &*std::mem::transmute::<FARPROC, GetStatusFn>(proc_addr)();
-                log::info!("Loader Status: {loader_status:?}");
-            });
+            thread::spawn(randomizer_utilities::loader_parser::set_loader_status);
 
             thread::spawn(|| {
                 main_setup();
