@@ -3,8 +3,8 @@ use crate::constants::{BasicNothingFunc, DMC1Config};
 use crate::utilities::{DMC1_ADDRESS, is_ddmk_loaded};
 use archipelago_rs::{Connection, ConnectionOptions, ItemHandling};
 use minhook::{MH_STATUS, MinHook};
+use randomizer_utilities::dmc::dmc_constants::GameConfig;
 use randomizer_utilities::exception_handler;
-use randomizer_utilities::mapping_utilities::GameConfig;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use windows::Win32::Foundation::HINSTANCE;
@@ -55,7 +55,7 @@ pub extern "system" fn DllMain(
             //ui::dx11_hooks::setup_overlay();
             randomizer_utilities::setup_logger("dmc1_randomizer");
             // Loader status
-            thread::spawn(randomizer_utilities::loader_parser::set_loader_status);
+            thread::spawn(randomizer_utilities::dmc::loader_parser::set_loader_status);
 
             thread::spawn(|| {
                 main_setup();

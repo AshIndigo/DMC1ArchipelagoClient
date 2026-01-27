@@ -1,6 +1,6 @@
 use crate::game_manager::ItemData;
 use bimap::BiMap;
-use randomizer_utilities::mapping_utilities::GameConfig;
+use randomizer_utilities::dmc::dmc_constants::GameConfig;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
