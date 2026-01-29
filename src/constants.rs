@@ -18,7 +18,7 @@ pub struct Item {
     pub id: u8,
     pub name: &'static str,
     pub category: u8,
-    pub mission: Option<u32>, // Mission the key item is used in, typically the same that it is acquired in
+    pub mission: Option<u8>, // Mission the key item is used in, typically the same that it is acquired in
     pub group: ItemCategory,
 }
 
@@ -419,8 +419,8 @@ impl PartialEq for Coordinates {
     }
 }
 
-pub static MISSION_ITEM_MAP: LazyLock<HashMap<u32, Vec<&'static str>>> = LazyLock::new(|| {
-    let mut map: HashMap<u32, Vec<&'static str>> = HashMap::new();
+pub static MISSION_ITEM_MAP: LazyLock<HashMap<u8, Vec<&'static str>>> = LazyLock::new(|| {
+    let mut map: HashMap<u8, Vec<&'static str>> = HashMap::new();
     for item in ALL_ITEMS.iter() {
         if let Some(mission) = item.mission {
             map.entry(mission).or_default().push(item.name);

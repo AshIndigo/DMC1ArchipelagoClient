@@ -172,7 +172,7 @@ fn set_relevant_key_items() {
 
     if let Ok(data) = ARCHIPELAGO_DATA.read() {
         with_session(|s| {
-            match MISSION_ITEM_MAP.get(&(s.mission as u32)) {
+            match MISSION_ITEM_MAP.get(&(s.mission)) {
                 None => {} // No items for the mission
                 Some(item_list) => {
                     for item in item_list.iter() {
@@ -199,7 +199,7 @@ pub fn is_item_relevant_to_mission(item_name: &str) -> bool {
     }
     let mut res = false;
     with_session(|s| {
-        match MISSION_ITEM_MAP.get(&(s.mission as u32)) {
+        match MISSION_ITEM_MAP.get(&(s.mission)) {
             None => {} // No items for the mission
             Some(item_list) => {
                 for item in item_list.iter() {

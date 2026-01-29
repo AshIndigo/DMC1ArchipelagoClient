@@ -58,3 +58,7 @@ pub(crate) fn clear_item_slot(item_data: &ItemData) {
     })
     .unwrap();
 }
+
+pub(crate) fn is_on_main_menu() -> bool {
+    true
+}

@@ -1,13 +1,14 @@
 use crate::check_handler::{Location, LocationType, TX_LOCATION};
 use crate::constants::*;
-use crate::game_manager::{ARCHIPELAGO_DATA, ArchipelagoData};
+use crate::game_manager::{ARCHIPELAGO_DATA, ArchipelagoData, get_mission};
 use crate::mapping::{DeathlinkSetting, Goal, MAPPING, Mapping, OVERLAY_INFO, OverlayInfo};
-use crate::{game_manager, hook, location_handler, mapping};
+use crate::{game_manager, hook, location_handler, mapping, skill_manager, utilities};
 use archipelago_rs::{
     AsItemId, Client, ClientStatus, Connection, ConnectionOptions, ConnectionState, CreateAsHint,
     DeathLinkOptions, Event, ItemHandling,
 };
 use randomizer_utilities::archipelago_utilities::{DeathLinkData, handle_print};
+use randomizer_utilities::item_sync::CURRENT_INDEX;
 use randomizer_utilities::{item_sync, setup_channel_pair};
 use std::error::Error;
 use std::sync::OnceLock;
@@ -200,7 +201,88 @@ fn handle_received_items_packet(
     index: usize,
     client: &mut Client<Mapping>,
 ) -> Result<(), Box<dyn Error>> {
-    // TODO Re-write
+    if index == 0 {
+        *ARCHIPELAGO_DATA.write()? = ArchipelagoData::default();
+    }
+
+    match ARCHIPELAGO_DATA.write() {
+        Ok(mut data) => {
+            for item in client.received_items().iter() {
+                match item.item().as_item_id() {
+                    40..43 => {
+                        if item.index() >= CURRENT_INDEX.load(Ordering::SeqCst) as usize {
+                            let orbs = match item.item().as_item_id() {
+                                1 => 1000,
+                                2 => 2500,
+                                3 => 5000,
+                                _ => unreachable!(),
+                            };
+                            //game_manager::give_red_orbs(orbs);
+                        }
+                    }
+                    6 => {
+                        data.add_blue_orb();
+                        game_manager::give_hp(1);
+                    }
+                    7 => {
+                        data.add_purple_orb();
+                        game_manager::give_magic(1, &data);
+                    }
+                    12..17 => {
+                        // Don't add duplicate consumables
+                        if item.index() >= CURRENT_INDEX.load(Ordering::SeqCst) as usize {
+                            utilities::insert_item_into_inv(
+                                ITEM_DATA_MAP.get(&item.item().name().as_str()).unwrap(),
+                            )
+                        }
+                    }
+                    39 => {
+                        // DT Unlock
+                        data.add_dt();
+                        game_manager::give_magic(3, &data);
+                    }
+                    18..39 => {
+                        // For key items
+                        log::debug!("Setting newly acquired key items");
+                        match MISSION_ITEM_MAP.get(&(get_mission())) {
+                            None => {} // No items for the mission
+                            Some(item_list) => {
+                                if item_list.contains(&&*item.item().name()) {
+                                    utilities::insert_unique_item_into_inv(
+                                        ITEM_DATA_MAP.get(&&*item.item().name()).unwrap(),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    17 => {
+                        log::debug!("Giving Bangle of time");
+                        utilities::insert_unique_item_into_inv(
+                            ITEM_DATA_MAP.get(&&*item.item().name()).unwrap(),
+                        )
+                    }
+                    100..114 => {
+                        // For skills
+                        if client.slot_data().randomize_skills {
+                            skill_manager::add_skill(item.item().id() as usize, &mut data);
+                            skill_manager::set_skills(&data); // Hacky...
+                        }
+                    }
+                    _ => {
+                        log::warn!(
+                            "Unhandled item ID: {} ({:#X})",
+                            item.item().name(),
+                            item.item().id()
+                        )
+                    }
+                }
+            }
+        }
+        Err(err) => {
+            log::error!("{}", err);
+        }
+    }
+
     Ok(())
 }
 

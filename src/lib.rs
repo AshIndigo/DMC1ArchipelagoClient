@@ -6,7 +6,7 @@ use minhook::{MH_STATUS, MinHook};
 use randomizer_utilities::dmc::dmc_constants::GameConfig;
 use randomizer_utilities::exception_handler;
 use std::sync::{Arc, Mutex, OnceLock};
-use std::thread;
+use std::{panic, thread};
 use windows::Win32::Foundation::HINSTANCE;
 use windows::core::BOOL;
 
@@ -23,6 +23,7 @@ mod mapping;
 mod save_handler;
 mod skill_manager;
 mod text_handler;
+mod ui;
 mod utilities;
 
 #[macro_export]
@@ -52,8 +53,11 @@ pub extern "system" fn DllMain(
 
     match fdw_reason {
         DLL_PROCESS_ATTACH => {
-            //ui::dx11_hooks::setup_overlay();
             randomizer_utilities::setup_logger("dmc1_randomizer");
+            panic::set_hook(Box::new(|info| {
+                log::error!("Panic occurred: {info}");
+            }));
+            ui::dx11_hooks::setup_overlay();
             // Loader status
             thread::spawn(randomizer_utilities::dmc::loader_parser::set_loader_status);
 
@@ -89,7 +93,7 @@ fn setup_main_loop_hook() -> Result<(), MH_STATUS> {
 pub static AP_CORE: OnceLock<Arc<Mutex<ArchipelagoCore>>> = OnceLock::new();
 
 static MAIN_LOOP_ORIGINAL: OnceLock<BasicNothingFunc> = OnceLock::new();
-const MAIN_LOOP_ADDR: usize = 0x337df0; // TODO Identify DMC1 Loop for use
+const MAIN_LOOP_ADDR: usize = 0x262660; // TODO I don't know if this is a good address
 fn main_loop_hook() {
     // Run original game code
     if let Some(func) = MAIN_LOOP_ORIGINAL.get() {
