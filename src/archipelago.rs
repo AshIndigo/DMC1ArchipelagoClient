@@ -2,6 +2,8 @@ use crate::check_handler::{Location, LocationType, TX_LOCATION};
 use crate::constants::*;
 use crate::game_manager::{ARCHIPELAGO_DATA, ArchipelagoData, get_mission};
 use crate::mapping::{DeathlinkSetting, Goal, MAPPING, Mapping, OVERLAY_INFO, OverlayInfo};
+use crate::ui::overlay;
+use crate::ui::overlay::{MessageSegment, MessageType, OverlayMessage};
 use crate::{game_manager, hook, location_handler, mapping, skill_manager, utilities};
 use archipelago_rs::{
     AsItemId, Client, ClientStatus, Connection, ConnectionOptions, ConnectionState, CreateAsHint,
@@ -9,11 +11,13 @@ use archipelago_rs::{
 };
 use randomizer_utilities::archipelago_utilities::{DeathLinkData, handle_print};
 use randomizer_utilities::item_sync::CURRENT_INDEX;
+use randomizer_utilities::ui::font_handler::{WHITE, YELLOW};
 use randomizer_utilities::{item_sync, setup_channel_pair};
 use std::error::Error;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
+use std::time::Duration;
 
 pub(crate) static CONNECTED: AtomicBool = AtomicBool::new(false);
 pub static TX_DEATHLINK: OnceLock<Sender<DeathLinkData>> = OnceLock::new();
@@ -121,9 +125,7 @@ impl ArchipelagoCore {
                     cause,
                     source,
                 } => {
-                    // TODO Overlay
-
-                    /*   overlay::add_message(OverlayMessage::new(
+                    overlay::add_message(OverlayMessage::new(
                         vec![MessageSegment::new(
                             format!("{}: {}", source, cause.unwrap_or_default()),
                             WHITE,
@@ -133,7 +135,7 @@ impl ArchipelagoCore {
                         0.0,
                         0.0,
                         MessageType::Notification,
-                    ));*/
+                    ));
 
                     match self.connection.client().unwrap().slot_data().death_link {
                         DeathlinkSetting::DeathLink => {
@@ -208,6 +210,28 @@ fn handle_received_items_packet(
     match ARCHIPELAGO_DATA.write() {
         Ok(mut data) => {
             for item in client.received_items().iter() {
+                // Display overlay text if we're not at the main menu
+                if !utilities::is_on_main_menu()
+                    && item.index() >= CURRENT_INDEX.load(Ordering::SeqCst) as usize
+                {
+                    let rec_msg: Vec<MessageSegment> = vec![
+                        MessageSegment::new("Received ".to_string(), WHITE),
+                        MessageSegment::new(
+                            item.item().name().to_string(),
+                            overlay::get_color_for_item(item.as_ref()),
+                        ),
+                        MessageSegment::new(" from ".to_string(), WHITE),
+                        MessageSegment::new(item.sender().name().parse()?, YELLOW),
+                    ];
+                    overlay::add_message(OverlayMessage::new(
+                        rec_msg,
+                        Duration::from_secs(3),
+                        0.0,
+                        0.0,
+                        MessageType::Notification,
+                    ));
+                }
+
                 match item.item().as_item_id() {
                     40..43 => {
                         if item.index() >= CURRENT_INDEX.load(Ordering::SeqCst) as usize {
@@ -388,161 +412,3 @@ fn disconnect(hooks_enabled: &mut bool) {
     *ARCHIPELAGO_DATA.write().unwrap() = ArchipelagoData::default(); // Reset Data (Probably not needed)
     log::info!("Game restored to default state");
 }
-
-/*pub fn handle_received_items_packet(
-    index: usize,
-    client: &mut Client<Mapping>,
-) -> Result<(), Box<dyn Error>> {
-    // Handle Checklist items here
-    if game_manager::session_is_valid() {
-        if index == 0 {
-            // If 0 reset stored data
-            *ARCHIPELAGO_DATA.write()? = ArchipelagoData::default();
-        }
-
-        if index == 0 {
-            // If 0 abandon previous inv.
-            match ARCHIPELAGO_DATA.write() {
-                Ok(mut data) => {
-                    *data = game_manager::ArchipelagoData::default();
-                    for item in &received_items_packet.items {
-                        match item.item {
-                            5 => {
-                                data.add_blue_orb();
-                            }
-                            6 => {
-                                data.add_purple_orb();
-                            }
-                            // TODO DT Item
-                            // 0x19 => {
-                            //     // Awakened Rebellion
-                            //     data.add_dt();
-                            // }
-                            _ => {}
-                        }
-                        if item.item < 0x53 && item.item > 0x39 {
-                            skill_manager::add_skill(item.item as usize, &mut data);
-                        }
-                    }
-                }
-                Err(err) => {
-                    log::error!("Couldn't get ArchipelagoData for write: {}", err)
-                }
-            }
-        }
-        if received_items_packet.index > CURRENT_INDEX.load(Ordering::SeqCst) {
-            log::debug!("Received new items packet: {:?}", received_items_packet);
-            match ARCHIPELAGO_DATA.write() {
-                Ok(mut data) => {
-                    for item in &received_items_packet.items {
-                        // TODO Get name from DP
-                        if let Some(item_name) = get_item_name(item.item) {
-                            // TODO Overlay stuff
-
-                            /*                 let rec_msg: Vec<MessageSegment> = vec![
-                                MessageSegment::new("Received ".to_string(), WHITE),
-                                MessageSegment::new(
-                                    item_name.to_string(),
-                                    overlay::get_color_for_item(item.flags),
-                                ),
-                                MessageSegment::new(" from ".to_string(), WHITE),
-                                MessageSegment::new(mapping_utilities::get_slot_name(item.player)?, YELLOW),
-                            ];
-                            overlay::add_message(OverlayMessage::new(
-                                rec_msg,
-                                Duration::from_secs(3),
-                                0.0,
-                                0.0,
-                                MessageType::Notification,
-                            ));*/
-                            if ((11..16).contains(&item.item))
-                            {
-                                for item in ALL_ITEMS {
-                                    if item.name == item_name {
-                                       // Add to inv
-                                    }
-                                }
-                            }
-
-                            log::debug!("Supplying added HP/Magic if needed");
-                            match item.item {
-                                5 => {
-                                    data.add_blue_orb();
-                                    // NOTE This fully restored HP, which while not intentional, is a mercy for DMC1
-                                    game_manager::ADD_ORB_FUNC(0);
-                                }
-                                6 => {
-                                    data.add_purple_orb();
-                                    game_manager::ADD_ORB_FUNC(1);
-                                }
-                                // TODO DT Item
-                                // 0x19 => {
-                                //     data.add_dt();
-                                //     //game_manager::give_magic(constants::ONE_ORB * 3.0, &data);
-                                // }
-                                _ => {
-                                    log::debug!("Unrecognized ID {} in received packet id", item.item)
-                                }
-                            }
-                            // For key items
-                            if item.item >= 17 && item.item <= 37 {
-                                log::debug!("Setting newly acquired key items");
-                                match MISSION_ITEM_MAP.get(&(get_mission() as u32)) {
-                                    None => {} // No items for the mission
-                                    Some(item_list) => {
-                                        if item_list.contains(&&*item_name) {
-                                            utilities::insert_unique_item_into_inv(
-                                                &ITEM_DATA_MAP.get(&&*item_name).unwrap(),
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        // TODO Can I make this a range?
-                        if (item.item <= 113 && item.item >= 100)
-                            && let Some(mapping) = MAPPING.read()?.as_ref()
-                            && mapping.randomize_skills
-                        {
-                            skill_manager::add_skill(item.item as usize, &mut data);
-                            skill_manager::set_skills(&data); // Hacky...
-                        }
-                    }
-                }
-                Err(err) => {
-                    log::error!("Couldn't get ArchipelagoData for write: {}", err)
-                }
-            }
-
-            CURRENT_INDEX.store(received_items_packet.index, Ordering::SeqCst);
-            let mut sync_data = item_sync::get_sync_data().lock()?;
-            let index = get_index(
-                &client.room_info().seed_name,
-                SLOT_NUMBER.load(Ordering::SeqCst),
-            );
-            if sync_data.room_sync_info.contains_key(&index) {
-                sync_data.room_sync_info.get_mut(&index).unwrap().sync_index =
-                    received_items_packet.index;
-            } else {
-                sync_data
-                    .room_sync_info
-                    .insert(index, RoomSyncInfo::default());
-            }
-        }
-        if let Ok(mut archipelago_data) = ARCHIPELAGO_DATA.write() {
-            for item in &received_items_packet.items {
-                if let Some(item_name) = get_item_name(item.item) {
-                    for item in ALL_ITEMS {
-                        if item.name == item_name {
-                            archipelago_data.add_item(item.name);
-                            // TODO Yellow Orbs
-                        }
-                    }
-                }
-            }
-        }
-        log::debug!("Writing sync file");
-        item_sync::write_sync_data_file()?;
-    }
-    Ok(())
-}*/

@@ -2,22 +2,18 @@ use crate::archipelago::CONNECTED;
 use crate::{mapping, utilities};
 use archipelago_rs::LocatedItem;
 use randomizer_utilities::dmc::loader_parser::LOADER_STATUS;
-use std::collections::VecDeque;
-use std::slice::from_raw_parts;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{LazyLock, Mutex, RwLock, RwLockReadGuard};
-use std::time::{Duration, Instant};
-use windows::Win32::Graphics::Direct3D11::*;
-use windows::Win32::Graphics::Direct3D11::{ID3D11Device, ID3D11Texture2D};
-use windows::Win32::Graphics::Dxgi::Common::{
-    DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32G32B32_FLOAT,
-};
-use windows::Win32::Graphics::Dxgi::*;
-use windows::core::{Interface, PCSTR};
 use randomizer_utilities::ui::dx11::{ORIGINAL_PRESENT, ORIGINAL_RESIZE_BUFFERS};
-use randomizer_utilities::ui::font_handler;
 use randomizer_utilities::ui::font_handler::{FontAtlas, FontColorCB, GREEN, RED, WHITE};
-use randomizer_utilities::ui::overlay::{D3D11State, SHADERS, STATE};
+use randomizer_utilities::ui::overlay::{D3D11State, STATE, get_resources};
+use randomizer_utilities::ui::{dx11_state_guard, font_handler};
+use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{LazyLock, Mutex, RwLockReadGuard};
+use std::time::{Duration, Instant};
+use windows::Win32::Graphics::Direct3D11::ID3D11Texture2D;
+use windows::Win32::Graphics::Direct3D11::*;
+use windows::Win32::Graphics::Dxgi::*;
+use windows::core::Interface;
 
 static MESSAGE_QUEUE: LazyLock<Mutex<VecDeque<OverlayMessage>>> =
     LazyLock::new(|| Mutex::new(VecDeque::new()));
@@ -77,121 +73,6 @@ pub(crate) fn add_message(overlay: OverlayMessage) {
     }
 }
 
-fn get_rtv_atlas(
-    device: &ID3D11Device,
-    swap_chain: &IDXGISwapChain,
-) -> (ID3D11RenderTargetView, FontAtlas) {
-    let atlas = {
-        const FONT_SIZE: f32 = 36.0;
-        const ROW_WIDTH: u32 = 256;
-        let chars: Vec<char> = (0u8..=127).map(|c| c as char).collect();
-        font_handler::create_rgba_font_atlas(device, &chars, FONT_SIZE, ROW_WIDTH).unwrap()
-    };
-
-    let rtv = {
-        let mut rtv = None;
-        if let Err(e) = unsafe {
-            device.CreateRenderTargetView(
-                &swap_chain.GetBuffer::<ID3D11Texture2D>(0).unwrap(),
-                None,
-                Some(&mut rtv),
-            )
-        } {
-            log::error!("Failed to create RTV: {:?}", e);
-        }
-        rtv.unwrap()
-    };
-    (rtv, atlas)
-}
-
-fn get_resources(swap_chain: &IDXGISwapChain) -> &RwLock<D3D11State> {
-    let state = STATE.get_or_init(|| {
-        let device: ID3D11Device = unsafe { swap_chain.GetDevice() }.unwrap();
-        let vertex_buffer = {
-            const VERTEX_BUFFER_DESC: D3D11_BUFFER_DESC = D3D11_BUFFER_DESC {
-                ByteWidth: (size_of::<font_handler::Vertex>() * 4 * 256) as u32,
-                Usage: D3D11_USAGE_DYNAMIC,
-                BindFlags: D3D11_BIND_VERTEX_BUFFER.0 as u32,
-                CPUAccessFlags: D3D11_CPU_ACCESS_WRITE.0 as u32,
-                MiscFlags: 0,
-                StructureByteStride: 0,
-            };
-
-            let mut vertex_buffer = None;
-            if let Err(e) =
-                unsafe { device.CreateBuffer(&VERTEX_BUFFER_DESC, None, Some(&mut vertex_buffer)) }
-            {
-                log::error!("Failed to create RTV: {:?}", e);
-            }
-            vertex_buffer.unwrap()
-        };
-        let input_layout = {
-            const INPUT_ELEMENT_DESCS: [D3D11_INPUT_ELEMENT_DESC; 2] = [
-                D3D11_INPUT_ELEMENT_DESC {
-                    SemanticName: PCSTR::from_raw(c"POSITION".as_ptr() as *const _),
-                    SemanticIndex: 0,
-                    Format: DXGI_FORMAT_R32G32B32_FLOAT,
-                    InputSlot: 0,
-                    AlignedByteOffset: 0,
-                    InputSlotClass: D3D11_INPUT_PER_VERTEX_DATA,
-                    InstanceDataStepRate: 0,
-                },
-                D3D11_INPUT_ELEMENT_DESC {
-                    SemanticName: PCSTR::from_raw(c"TEXCOORD".as_ptr() as *const _),
-                    SemanticIndex: 0,
-                    Format: DXGI_FORMAT_R32G32_FLOAT,
-                    InputSlot: 0,
-                    AlignedByteOffset: 12, // after the float3 position
-                    InputSlotClass: D3D11_INPUT_PER_VERTEX_DATA,
-                    InstanceDataStepRate: 0,
-                },
-            ];
-            let (_, vsb) = &*SHADERS;
-            let mut input_thingy = None;
-            unsafe {
-                device
-                    .CreateInputLayout(
-                        &INPUT_ELEMENT_DESCS,
-                        from_raw_parts(vsb.GetBufferPointer() as *const u8, vsb.GetBufferSize()),
-                        Some(&mut input_thingy),
-                    )
-                    .unwrap();
-            }
-            input_thingy.unwrap()
-        };
-        let (rtv, atlas) = get_rtv_atlas(&device, swap_chain);
-        RwLock::new(D3D11State {
-            device,
-            context: unsafe {
-                swap_chain
-                    .GetDevice::<ID3D11Device>()
-                    .unwrap()
-                    .GetImmediateContext()
-            }
-            .unwrap(),
-            atlas: Some(atlas),
-            input_layout,
-            vertex_buffer,
-            rtv: Some(rtv),
-        })
-    });
-    match state.write() {
-        Ok(mut state) => {
-            let (rtv, atlas) = get_rtv_atlas(&state.device, swap_chain);
-            if state.rtv.is_none() {
-                state.rtv = Some(rtv);
-            }
-            if state.atlas.is_none() {
-                state.atlas = Some(atlas);
-            }
-        }
-        Err(err) => {
-            log::error!("PoisonError upon trying to write {:?}", err);
-        }
-    }
-    state
-}
-
 pub(crate) unsafe extern "system" fn resize_hook(
     swap_chain: *mut IDXGISwapChain,
     buffer_count: u32,
@@ -239,7 +120,6 @@ unsafe fn update_screen_size(swap_chain: &IDXGISwapChain) -> (f32, f32) {
 
     (desc.Width as f32, desc.Height as f32)
 }
-
 pub(crate) unsafe extern "system" fn present_hook(
     orig_swap_chain: IDXGISwapChain,
     sync_interval: u32,
@@ -249,102 +129,9 @@ pub(crate) unsafe extern "system" fn present_hook(
     let state = get_resources(&orig_swap_chain);
     match state.read() {
         Ok(state) => {
-            unsafe {
-                state
-                    .context
-                    .OMSetRenderTargets(Some(std::slice::from_ref(&state.rtv)), None);
-                state.context.RSSetViewports(Some(&[D3D11_VIEWPORT {
-                    TopLeftX: 0.0,
-                    TopLeftY: 0.0,
-                    Width: screen_width,
-                    Height: screen_height,
-                    MinDepth: 0.0,
-                    MaxDepth: 1.0,
-                }]));
-            }
-
-            if (utilities::is_on_main_menu() || should_display_anyway())
-                && let Some(atlas) = &state.atlas
-            {
-                const STATUS: &str = "Status: ";
-                font_handler::draw_string(
-                    &state,
-                    STATUS,
-                    0.0,
-                    0.0,
-                    screen_width,
-                    screen_height,
-                    get_default_color(),
-                );
-                let connected = CONNECTED.load(Ordering::SeqCst);
-                font_handler::draw_string(
-                    &state,
-                    if connected {
-                        "Connected"
-                    } else {
-                        "Disconnected"
-                    },
-                    STATUS.chars().map(|c| atlas.glyph_advance(c)).sum::<f32>(),
-                    0.0,
-                    screen_width,
-                    screen_height,
-                    &if connected { GREEN } else { RED },
-                );
-                draw_version_info(&state, screen_width, screen_height, atlas);
-            }
-            if CANT_PURCHASE.load(Ordering::SeqCst)
-                && let Some(atlas) = &state.atlas
-            {
-                // TODO Modify this text
-                const NO_PURCHASE: &str = "Cannot purchase upgrades";
-                const NO_PURCHASE_L2: &str = "due to world settings";
-                font_handler::draw_string(
-                    &state,
-                    NO_PURCHASE,
-                    480.0
-                        + (NO_PURCHASE
-                            .chars()
-                            .map(|c| atlas.glyph_advance(c))
-                            .sum::<f32>()
-                            / 2.0),
-                    70.0,
-                    screen_width,
-                    screen_height,
-                    &WHITE,
-                );
-                font_handler::draw_string(
-                    &state,
-                    NO_PURCHASE_L2,
-                    480.0
-                        + (NO_PURCHASE
-                            .chars()
-                            .map(|c| atlas.glyph_advance(c))
-                            .sum::<f32>()
-                            / 2.0),
-                    106.0,
-                    screen_width,
-                    screen_height,
-                    &WHITE,
-                );
-                CANT_PURCHASE.store(false, Ordering::SeqCst);
-            }
-
-            pop_buffer_message();
-
-            let now = Instant::now();
-            if let Ok(mut active) = ACTIVE_MESSAGES.lock() {
-                // If it hasn't expired, keep it around
-                active.retain(|msg| msg.expiration > now);
-
-                const PADDING: f32 = 12.0;
-                const LINE_HEIGHT: f32 = 24.0;
-
-                let mut y = PADDING;
-                for msg in active.iter().rev() {
-                    draw_colored_message(&state, msg, screen_width, screen_height, y);
-                    y += LINE_HEIGHT + PADDING;
-                }
-            }
+            let original_state = dx11_state_guard::DX11OverlayBackup::new(&state.context);
+            draw_overlay(screen_width, screen_height, &state);
+            original_state.restore(&state.context);
         }
         Err(err) => {
             log::error!("Failed to get resources: {:?}", err);
@@ -352,6 +139,105 @@ pub(crate) unsafe extern "system" fn present_hook(
     }
 
     unsafe { ORIGINAL_PRESENT.get().unwrap()(orig_swap_chain, sync_interval, flags) }
+}
+
+fn draw_overlay(screen_width: f32, screen_height: f32, state: &RwLockReadGuard<D3D11State>) {
+    unsafe {
+        state
+            .context
+            .OMSetRenderTargets(Some(std::slice::from_ref(&state.rtv)), None);
+        state.context.RSSetViewports(Some(&[D3D11_VIEWPORT {
+            TopLeftX: 0.0,
+            TopLeftY: 0.0,
+            Width: screen_width,
+            Height: screen_height,
+            MinDepth: 0.0,
+            MaxDepth: 1.0,
+        }]));
+    }
+
+    if (utilities::is_on_main_menu() || should_display_anyway())
+        && let Some(atlas) = &state.atlas
+    {
+        const STATUS: &str = "Status: ";
+        font_handler::draw_string(
+            state,
+            STATUS,
+            0.0,
+            0.0,
+            screen_width,
+            screen_height,
+            get_default_color(),
+        );
+        let connected = CONNECTED.load(Ordering::SeqCst);
+        font_handler::draw_string(
+            state,
+            if connected {
+                "Connected"
+            } else {
+                "Disconnected"
+            },
+            STATUS.chars().map(|c| atlas.glyph_advance(c)).sum::<f32>(),
+            0.0,
+            screen_width,
+            screen_height,
+            &if connected { GREEN } else { RED },
+        );
+        draw_version_info(state, screen_width, screen_height, atlas);
+    }
+    if CANT_PURCHASE.load(Ordering::SeqCst)
+        && let Some(atlas) = &state.atlas
+    {
+        // TODO Modify this text
+        const NO_PURCHASE: &str = "Cannot purchase upgrades";
+        const NO_PURCHASE_L2: &str = "due to world settings";
+        font_handler::draw_string(
+            state,
+            NO_PURCHASE,
+            480.0
+                + (NO_PURCHASE
+                    .chars()
+                    .map(|c| atlas.glyph_advance(c))
+                    .sum::<f32>()
+                    / 2.0),
+            70.0,
+            screen_width,
+            screen_height,
+            &WHITE,
+        );
+        font_handler::draw_string(
+            state,
+            NO_PURCHASE_L2,
+            480.0
+                + (NO_PURCHASE
+                    .chars()
+                    .map(|c| atlas.glyph_advance(c))
+                    .sum::<f32>()
+                    / 2.0),
+            106.0,
+            screen_width,
+            screen_height,
+            &WHITE,
+        );
+        CANT_PURCHASE.store(false, Ordering::SeqCst);
+    }
+
+    pop_buffer_message();
+
+    let now = Instant::now();
+    if let Ok(mut active) = ACTIVE_MESSAGES.lock() {
+        // If it hasn't expired, keep it around
+        active.retain(|msg| msg.expiration > now);
+
+        const PADDING: f32 = 12.0;
+        const LINE_HEIGHT: f32 = 24.0;
+
+        let mut y = PADDING;
+        for msg in active.iter().rev() {
+            draw_colored_message(state, msg, screen_width, screen_height, y);
+            y += LINE_HEIGHT + PADDING;
+        }
+    }
 }
 
 fn draw_version_info(

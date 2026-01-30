@@ -1,5 +1,5 @@
 use crate::game_manager::{ItemData, with_session};
-use randomizer_utilities::get_base_address;
+use randomizer_utilities::{get_base_address, read_data_from_address};
 use std::sync::LazyLock;
 
 pub static DMC1_ADDRESS: LazyLock<usize> = LazyLock::new(|| get_base_address("dmc1.exe"));
@@ -60,5 +60,8 @@ pub(crate) fn clear_item_slot(item_data: &ItemData) {
 }
 
 pub(crate) fn is_on_main_menu() -> bool {
-    true
+    // Somehow works better than DMC3's
+    let val =
+        read_data_from_address::<u8>(read_data_from_address::<usize>(*DMC1_ADDRESS + 0x60b018));
+    val == 5
 }
