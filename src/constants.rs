@@ -12,7 +12,12 @@ pub const MAX_MAGIC: u8 = 10;
 pub const INITIAL_MAGIC: u8 = 0; // 3 Normal and up, 6 on easy
 pub const NO_MISSION: u32 = 0;
 
-pub(crate) static REMOTE_ID: LazyLock<u32> = LazyLock::new(|| 100);
+// Store categories
+pub const EXTRA_STORE: u8 = 0;
+pub const ALASTOR_STORE: u8 = 1;
+pub const IFRIT_STORE: u8 = 2;
+
+pub(crate) static REMOTE_ID: LazyLock<u32> = LazyLock::new(|| 200);
 #[derive(Debug)]
 pub struct Item {
     pub id: u8,
@@ -41,7 +46,7 @@ pub(crate) enum ItemCategory {
 }
 
 // Skipping over items I don't find useful
-pub(crate) const ALL_ITEMS: [Item; 43] = [
+pub(crate) const ALL_ITEMS: [Item; 51] = [
     Item {
         id: 0,
         name: "Handgun",
@@ -120,6 +125,20 @@ pub(crate) const ALL_ITEMS: [Item; 43] = [
         group: ItemCategory::Misc,
     },
     Item {
+        id: 0,
+        name: "Red Orb - 1",
+        category: 2,
+        mission: None,
+        group: ItemCategory::Misc,
+    },
+    Item {
+        id: 1,
+        name: "Red Orb - 5",
+        category: 2,
+        mission: None,
+        group: ItemCategory::Misc,
+    },
+    Item {
         id: 1,
         name: "Luminite",
         category: 1,
@@ -134,8 +153,50 @@ pub(crate) const ALL_ITEMS: [Item; 43] = [
         group: ItemCategory::Consumable,
     },
     Item {
+        id: 3,
+        name: "Mystery orb!",
+        category: 2,
+        mission: None,
+        group: ItemCategory::Misc,
+    },
+    Item {
         id: 4,
         name: "Blue Orb Fragment",
+        category: 2,
+        mission: None,
+        group: ItemCategory::Misc,
+    },
+    Item {
+        id: 5, // 2 Blorb frags
+        name: "2/4 Blue Orb Fragments",
+        category: 2,
+        mission: None,
+        group: ItemCategory::Misc,
+    },
+    Item {
+        id: 6, // 3 Blorb Frags
+        name: "3/4 Blue Orb Fragments",
+        category: 2,
+        mission: None,
+        group: ItemCategory::Misc,
+    },
+    Item {
+        id: 7, // Full Blue Orb?
+        name: "Blue Orb",
+        category: 2,
+        mission: None,
+        group: ItemCategory::Misc,
+    },
+    Item {
+        id: 8,
+        name: "Mystery Orb!",
+        category: 2,
+        mission: None,
+        group: ItemCategory::Misc,
+    },
+    Item {
+        id: 9,
+        name: "Grenade Ammo",
         category: 2,
         mission: None,
         group: ItemCategory::Misc,
@@ -148,6 +209,7 @@ pub(crate) const ALL_ITEMS: [Item; 43] = [
         mission: None,
         group: ItemCategory::Consumable,
     },
+    // Cat 2 ID 11?
     Item {
         id: 13,
         name: "Devil Star",
@@ -155,6 +217,7 @@ pub(crate) const ALL_ITEMS: [Item; 43] = [
         mission: None,
         group: ItemCategory::Consumable,
     },
+    // Cat 2 ID 12?
     Item {
         id: 14,
         name: "Untouchable",
@@ -162,6 +225,7 @@ pub(crate) const ALL_ITEMS: [Item; 43] = [
         mission: None,
         group: ItemCategory::Consumable,
     },
+    // Cat 2 ID 13?
     Item {
         id: 15,
         name: "Holy Water",
@@ -390,7 +454,7 @@ pub(crate) enum Difficulty {
 #[derive(Debug)]
 pub struct ItemEntry {
     // Represents an item on the ground
-    pub offset: usize,    // Offset for the item table
+    pub _offset: usize,   // Offset for the item table // TODO Can be removed?
     pub room_number: i32, // Room number
     pub track_number: i32,
     pub item_id: u32, // Default Item ID

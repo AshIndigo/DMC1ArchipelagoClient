@@ -93,7 +93,7 @@ fn setup_main_loop_hook() -> Result<(), MH_STATUS> {
 pub static AP_CORE: OnceLock<Arc<Mutex<ArchipelagoCore>>> = OnceLock::new();
 
 static MAIN_LOOP_ORIGINAL: OnceLock<BasicNothingFunc> = OnceLock::new();
-const MAIN_LOOP_ADDR: usize = 0x262660; // TODO I don't know if this is a good address
+const MAIN_LOOP_ADDR: usize = 0x262660;
 fn main_loop_hook() {
     // Run original game code
     if let Some(func) = MAIN_LOOP_ORIGINAL.get() {
@@ -102,16 +102,17 @@ fn main_loop_hook() {
         }
     }
 
-    if let Ok(mut core) = AP_CORE
-        .get_or_init(|| {
-            ArchipelagoCore::new(
-                config::CONFIG.connections.get_url(),
-                DMC1Config::GAME_NAME.parse().unwrap(),
-            )
-            .map(|core| Arc::new(Mutex::new(core)))
-            .unwrap()
-        })
-        .lock()
+    if !config::CONFIG.connections.disable_auto_connect
+        && let Ok(mut core) = AP_CORE
+            .get_or_init(|| {
+                ArchipelagoCore::new(
+                    config::CONFIG.connections.get_url(),
+                    DMC1Config::GAME_NAME.parse().unwrap(),
+                )
+                .map(|core| Arc::new(Mutex::new(core)))
+                .unwrap()
+            })
+            .lock()
         && let Err(err) = core.update()
     {
         log::error!("{}", err);

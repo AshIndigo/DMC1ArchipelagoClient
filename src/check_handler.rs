@@ -1,14 +1,13 @@
 use crate::constants::{
-    BasicNothingFunc, Coordinates, Difficulty, EMPTY_COORDINATES, ITEM_DATA_MAP, Rank,
-    find_item_by_vals,
+    BasicNothingFunc, Coordinates, Difficulty, EMPTY_COORDINATES, Rank, find_item_by_vals,
 };
 use crate::game_manager::{ItemData, get_mission, get_room, get_track, with_session_read};
 use crate::mapping::CACHED_LOCATIONS;
 use crate::utilities::{DMC1_ADDRESS, clear_item_slot};
-use crate::{create_hook, hook, location_handler};
+use crate::{constants, create_hook, hook, location_handler};
 use minhook::MH_STATUS;
 use minhook::MinHook;
-use randomizer_utilities::{read_data_from_address, replace_single_byte};
+use randomizer_utilities::read_data_from_address;
 use std::fmt::{Display, Formatter};
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -20,6 +19,7 @@ pub(crate) static TX_LOCATION: OnceLock<Sender<Location>> = OnceLock::new();
 pub(crate) enum LocationType {
     Standard,
     MissionComplete,
+    // TODO No concept of SS Ranks in DMC1, should I replace with S Rank checks? Or drop it
     SSRank,
     PurchaseItem,
 }
@@ -56,7 +56,26 @@ impl PartialEq for Location {
 }
 
 pub const ITEM_PICKUP_ADDR: usize = 0x3d5d80;
+// 3c50b0; - Doesn't work because its also called when inv is opened
+// 0x3c5390 - Also called from inv.
 static ORIGINAL_PICKUP: OnceLock<BasicNothingFunc> = OnceLock::new();
+
+static CALL_COUNT: AtomicU8 = AtomicU8::new(0);
+
+const IGNORED_ITEMS: [ItemData; 2] = [
+    // Red Orbs - 1
+    ItemData {
+        category: 2,
+        id: 0,
+        count: 0,
+    },
+    // Red Orbs - 5
+    ItemData {
+        category: 2,
+        id: 1,
+        count: 0,
+    },
+];
 
 // This works, just has the issue of running 4 times for some reason
 pub fn item_pickup() {
@@ -67,54 +86,87 @@ pub fn item_pickup() {
     // Points to ItemData
     const CATEGORY_OFFSET: usize = 0x88;
     const ID_OFFSET: usize = 0x89;
+    let call_count = CALL_COUNT.load(Ordering::Relaxed);
+    if call_count == 0 {
+        let data_addr: usize = read_data_from_address(*DMC1_ADDRESS + WEAPON_DATA);
+        let pickup_offset: usize = read_data_from_address(data_addr + OFFSET_1);
+        let category: u8 = read_data_from_address(pickup_offset + CATEGORY_OFFSET);
+        let id: u8 = read_data_from_address(pickup_offset + ID_OFFSET);
+        let item_data = ItemData {
+            id,
+            category,
+            count: 0,
+        };
+        if !IGNORED_ITEMS.contains(&item_data) {
+            log::debug!(
+                "Item pickup: Category: {} ID: {} - Item is: {:?}\nMission: {}, Room: {}, Track: {}",
+                category,
+                id,
+                find_item_by_vals(id, category),
+                get_mission(),
+                get_room(),
+                get_track()
+            );
+            // Gather location info
+            let received_item = Location {
+                location_type: LocationType::Standard,
+                item_id: id as u32,
+                item_category: category,
+                room: get_room(),
+                track: get_track(),
+                mission: get_mission() as u32,
+                coordinates: EMPTY_COORDINATES,
+            };
+            // Send off information
+            send_off_location_coords(received_item, 2);
 
-    let data_addr: usize = read_data_from_address(*DMC1_ADDRESS + WEAPON_DATA);
-    let pickup_offset: usize = read_data_from_address(data_addr + OFFSET_1);
-    let category: u8 = read_data_from_address(pickup_offset + CATEGORY_OFFSET);
-    let id: u8 = read_data_from_address(pickup_offset + ID_OFFSET);
-    log::debug!(
-        "Item pickup: Category: {} ID: {} - Item is: {:?}\nMission: {}, Room: {}, Track: {}",
-        category,
-        id,
-        find_item_by_vals(id, category),
-        get_mission(),
-        get_room(),
-        get_track()
-    );
-    // Gather location info
-    let received_item = Location {
-        location_type: LocationType::Standard,
-        item_id: id as u32,
-        item_category: category,
-        room: get_room(),
-        track: get_track(),
-        mission: get_mission() as u32,
-        coordinates: EMPTY_COORDINATES,
-    };
-    // Send off information
-    send_off_location_coords(received_item, 2);
-
-    // Figure out which location we are at for replacement purposes
-    match location_handler::get_location_name_by_data(&received_item) {
-        Ok(loc_key) => {
-            // Get the AP item data for that location
-            let item_name = CACHED_LOCATIONS
-                .read()
-                .unwrap()
-                .get(loc_key)
-                .unwrap()
-                .item()
-                .name();
-            log::debug!("Actual item name is {item_name}");
-            let data = ITEM_DATA_MAP.get(&item_name.as_str()).unwrap();
-            unsafe {
-                replace_single_byte(pickup_offset + ID_OFFSET, data.id);
-                replace_single_byte(pickup_offset + CATEGORY_OFFSET, data.category);
+            // Figure out which location we are at for replacement purposes
+            match crate::AP_CORE.get().unwrap().lock() {
+                Ok(core) => {
+                    if let Some(client) = core.connection.client() {
+                        match location_handler::get_location_name_by_data(&received_item, client) {
+                            Ok(loc_key) => {
+                                // Get the AP item data for that location
+                                let item_name = CACHED_LOCATIONS
+                                    .read()
+                                    .unwrap()
+                                    .get(loc_key)
+                                    .unwrap()
+                                    .item()
+                                    .name();
+                                log::debug!("Actual item name is {item_name}");
+                                // TODO Need to properly display what the item actually is. Right now this actually tricks the game into giving the displayed item
+                                let data = location_handler::get_mapped_data(loc_key).unwrap();
+                                unsafe {
+                                    randomizer_utilities::replace_single_byte(
+                                        pickup_offset + ID_OFFSET,
+                                        data.id,
+                                    );
+                                    randomizer_utilities::replace_single_byte(
+                                        pickup_offset + CATEGORY_OFFSET,
+                                        data.category,
+                                    );
+                                }
+                            }
+                            Err(err) => {
+                                log::error!("Failed to get location key: {}", err);
+                            }
+                        }
+                    }
+                }
+                Err(err) => {
+                    log::error!("Failed to get core: {}", err);
+                }
             }
         }
-        Err(err) => {
-            log::error!("Failed to get location key: {}", err);
-        }
+    }
+
+    // Only want this to call once, no need to check the same loc
+    if call_count >= 3 {
+        log::debug!("Resetting call count");
+        CALL_COUNT.store(0, Ordering::Relaxed);
+    } else {
+        CALL_COUNT.fetch_add(1, Ordering::Relaxed);
     }
 
     if let Some(func) = ORIGINAL_PICKUP.get() {
@@ -149,16 +201,23 @@ pub fn setup_check_hooks() -> Result<(), MH_STATUS> {
             ORIGINAL_MISSION_COMPLETE,
             "Mission Complete"
         );
+        create_hook!(
+            PURCHASE_ITEM_ADDR,
+            purchase_item,
+            ORIGINAL_PURCHASE_ITEM,
+            "Purchase Item"
+        );
     }
     Ok(())
 }
 
 pub(crate) fn add_hooks_to_list(addrs: &mut Vec<usize>) {
-    const ADDRESSES: [usize; 4] = [
+    const ADDRESSES: [usize; 5] = [
         ITEM_PICKUP_ADDR,
         ADD_ITEM_ADDR,
         DISPLAY_ITEMS_ADDR,
         MISSION_COMPLETE_ADDR,
+        PURCHASE_ITEM_ADDR,
     ];
     for a in ADDRESSES.iter() {
         addrs.push(*a);
@@ -220,7 +279,7 @@ fn mission_complete() {
     with_session_read(|session| {
         log::debug!(
             "Mission {} Complete - Difficulty: {} - Rank: {}",
-            session.mission,
+            session.mission - 1,
             Difficulty::from_repr(session.difficulty as usize).unwrap(),
             Rank::from_repr(session.rank as usize).unwrap()
         );
@@ -230,7 +289,7 @@ fn mission_complete() {
                 item_id: u32::MAX,
                 room: -1,
                 track: -1,
-                mission: session.mission as u32,
+                mission: (session.mission - 1) as u32,
                 coordinates: EMPTY_COORDINATES,
                 item_category: 0,
             },
@@ -238,6 +297,60 @@ fn mission_complete() {
         );
     })
     .unwrap();
+}
+
+static PURCHASE_ITEM_ADDR: usize = 0x3DF5B0; // Called every attempted purchase
+static ORIGINAL_PURCHASE_ITEM: OnceLock<BasicNothingFunc> = OnceLock::new();
+
+pub fn purchase_item() {
+    const WEAPON_DATA: usize = 0x60AD10;
+    const PURCHASE_IDX_OFFSET: usize = 0xAA6D;
+    const PURCHASE_MENU_IDX_OFFSET: usize = 0xAA6C;
+    let orig_red_orbs = with_session_read(|session| session.red_orbs).unwrap();
+    if let Some(orig) = ORIGINAL_PURCHASE_ITEM.get() {
+        unsafe {
+            orig();
+        }
+    }
+    if with_session_read(|session| session.red_orbs).unwrap() < orig_red_orbs {
+        let data_addr: usize = read_data_from_address(*DMC1_ADDRESS + WEAPON_DATA);
+        let idx: u8 = read_data_from_address(data_addr + PURCHASE_IDX_OFFSET);
+        let category: u8 = read_data_from_address(data_addr + PURCHASE_MENU_IDX_OFFSET);
+        match category {
+            constants::EXTRA_STORE => {
+                let count = match idx {
+                    5 => with_session_read(|s| s.bought_hp).unwrap(),
+                    6 => with_session_read(|s| s.bought_magic).unwrap(),
+                    // Ignored
+                    _ => u8::MAX,
+                };
+                if count != u8::MAX {
+                    send_off_location_coords(
+                        Location {
+                            location_type: LocationType::PurchaseItem,
+                            item_id: idx as u32,
+                            mission: count as u32,
+                            room: 0,
+                            coordinates: EMPTY_COORDINATES,
+                            track: 0,
+                            item_category: category,
+                        },
+                        u32::MAX,
+                    );
+                }
+            }
+            // TODO Buying skill checks
+            constants::ALASTOR_STORE => {
+                // Skill purchases do not differentiate between skill levels
+                log::debug!("Alastor skill purchase: {idx}");
+            }
+            constants::IFRIT_STORE => {
+                // Skill purchases do not differentiate between skill levels
+                log::debug!("Ifrit skill purchase: {idx}");
+            }
+            _ => unreachable!(),
+        }
+    }
 }
 
 fn send_off_location_coords(loc: Location, to_display: u32) {

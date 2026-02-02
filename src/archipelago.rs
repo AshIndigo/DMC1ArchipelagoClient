@@ -1,6 +1,8 @@
 use crate::check_handler::{Location, LocationType, TX_LOCATION};
 use crate::constants::*;
-use crate::game_manager::{ARCHIPELAGO_DATA, ArchipelagoData, get_mission};
+use crate::game_manager::{
+    ADD_ORB_FUNC, ARCHIPELAGO_DATA, ArchipelagoData, get_mission, with_session,
+};
 use crate::mapping::{DeathlinkSetting, Goal, MAPPING, Mapping, OVERLAY_INFO, OverlayInfo};
 use crate::ui::overlay;
 use crate::ui::overlay::{MessageSegment, MessageType, OverlayMessage};
@@ -17,7 +19,7 @@ use std::error::Error;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub(crate) static CONNECTED: AtomicBool = AtomicBool::new(false);
 pub static TX_DEATHLINK: OnceLock<Sender<DeathLinkData>> = OnceLock::new();
@@ -174,7 +176,14 @@ impl ArchipelagoCore {
     pub fn handle_channels(&mut self) -> Result<(), Box<dyn Error>> {
         match self.location_receiver.try_recv() {
             Ok(location) => {
-                handle_item_receive(self.connection.client_mut().unwrap(), location)?;
+                if let Some(client) = self.connection.client_mut() {
+                    handle_item_receive(client, location)?;
+                } else {
+                    log::error!(
+                        "Received location check while client was None: {}",
+                        location
+                    );
+                }
             }
             Err(err) => {
                 if err == TryRecvError::Disconnected {
@@ -199,7 +208,7 @@ impl ArchipelagoCore {
     }
 }
 
-fn handle_received_items_packet(
+pub(crate) fn handle_received_items_packet(
     index: usize,
     client: &mut Client<Mapping>,
 ) -> Result<(), Box<dyn Error>> {
@@ -233,37 +242,61 @@ fn handle_received_items_packet(
                 }
 
                 match item.item().as_item_id() {
-                    40..43 => {
+                    41..=43 => {
                         if item.index() >= CURRENT_INDEX.load(Ordering::SeqCst) as usize {
                             let orbs = match item.item().as_item_id() {
-                                1 => 1000,
-                                2 => 2500,
-                                3 => 5000,
+                                41 => 100,
+                                42 => 150,
+                                43 => 200,
                                 _ => unreachable!(),
                             };
-                            //game_manager::give_red_orbs(orbs);
+                            game_manager::give_red_orbs(orbs);
                         }
+                    }
+                    1..6 => {
+                        // Guns
+                        utilities::insert_unique_item_into_inv(
+                            ITEM_DATA_MAP.get(&&*item.item().name()).unwrap(),
+                        )
                     }
                     6 => {
                         data.add_blue_orb();
-                        game_manager::give_hp(1);
+                        ADD_ORB_FUNC(0);
+                        //game_manager::give_hp(1);
                     }
                     7 => {
                         data.add_purple_orb();
-                        game_manager::give_magic(1, &data);
+                        ADD_ORB_FUNC(1);
+                        //game_manager::give_magic(1, &data);
+                    }
+                    8..12 => {
+                        // Weapons
+                        utilities::insert_unique_item_into_inv(
+                            ITEM_DATA_MAP.get(&&*item.item().name()).unwrap(),
+                        )
                     }
                     12..17 => {
                         // Don't add duplicate consumables
                         if item.index() >= CURRENT_INDEX.load(Ordering::SeqCst) as usize {
-                            utilities::insert_item_into_inv(
-                                ITEM_DATA_MAP.get(&item.item().name().as_str()).unwrap(),
-                            )
+                            if item.item().id() == 15 {
+                                with_session(|session| {
+                                    session.yellow_orbs += 1;
+                                })
+                                .unwrap();
+                            } else {
+                                utilities::insert_item_into_inv(
+                                    ITEM_DATA_MAP.get(&item.item().name().as_str()).unwrap(),
+                                )
+                            }
                         }
                     }
                     39 => {
                         // DT Unlock
                         data.add_dt();
-                        game_manager::give_magic(3, &data);
+                        for _ in 0..3 {
+                            ADD_ORB_FUNC(1);
+                        }
+                        //game_manager::give_magic(3, &data);
                     }
                     18..39 => {
                         // For key items
@@ -294,11 +327,15 @@ fn handle_received_items_packet(
                     }
                     _ => {
                         log::warn!(
-                            "Unhandled item ID: {} ({:#X})",
+                            "Unhandled item ID: {} ({})",
                             item.item().name(),
                             item.item().id()
                         )
                     }
+                }
+                data.add_item(item.item().name().into());
+                if item.index() >= CURRENT_INDEX.load(Ordering::SeqCst) as usize {
+                    CURRENT_INDEX.store((item.index() + 1) as i64, Ordering::SeqCst);
                 }
             }
         }
@@ -321,7 +358,7 @@ fn handle_item_receive(
     {
         //take_away_received_item(received_item.item_id);
     }
-    let location_key = location_handler::get_location_name_by_data(&received_item)?;
+    let location_key = location_handler::get_location_name_by_data(&received_item, client)?;
     // Then see if the item picked up matches the specified in the map
     match mapping::CACHED_LOCATIONS.read()?.get(location_key) {
         Some(located_item) => {
@@ -389,7 +426,10 @@ fn has_reached_goal(client: &mut Client<Mapping>) -> bool {
 /// This is run when a there is a valid connection to a room.
 pub fn run_setup(client: &mut Client<Mapping>) -> Result<(), Box<dyn Error>> {
     log::info!("Running setup");
-    mapping::run_scouts_for_mission(client, NO_MISSION, CreateAsHint::New);
+    mapping::run_scouts_for_mission(client, NO_MISSION, CreateAsHint::No);
+    for i in 1..=23 {
+        mapping::run_scouts_for_mission(client, i, CreateAsHint::No);
+    }
     mapping::run_scouts_for_secret_mission(client);
     Ok(())
 }

@@ -194,7 +194,8 @@ fn set_relevant_key_items() {
 
 /// False if it isn't, true if it is
 pub fn is_item_relevant_to_mission(item_name: &str) -> bool {
-    if get_items_by_category(ItemCategory::Consumable).contains(&item_name) {
+    // Key items need to be checked, not others
+    if !get_items_by_category(ItemCategory::Key).contains(&item_name) {
         return true;
     }
     let mut res = false;

@@ -138,14 +138,17 @@ pub struct SessionData {
     unknown11: [u8; 55],
     pub(crate) item_count: u8,
     unknown12: [u8; 20],
-    pub(crate) item_data: [ItemData; 245],
+    pub(crate) item_data: [ItemData; 244],
+    pub yellow_orbs: u16, // Capped at 999
+    yellow_orbs_used: u16,
     pub(crate) hp: u8,
     pub(crate) magic: u8,
-    unknown14: [u8; 2],
+    pub bought_hp: u8,
+    pub bought_magic: u8,
     pub(crate) expertise: [u8; 4], // ?? ?? Ifrit Alastor
-    unknown15: [u8; 8],            // TODO Find where yellow orbs are kept
+    unknown15: [u8; 8],
     pub(crate) red_orbs: u32,
-    unknown16: [u8; 4],
+    blue_orb_fragments: u32, // Correct?
     orb_flags: u32,
 }
 
@@ -407,3 +410,10 @@ pub static CHANGE_EQUIPPED_GUN: LazyLock<extern "C" fn(u32)> =
 pub static CHANGE_EQUIPPED_MELEE: LazyLock<extern "C" fn(u32, u32)> = LazyLock::new(|| unsafe {
     transmute::<usize, extern "C" fn(u32, u32)>(*DMC1_ADDRESS + 0x2C99C0)
 });
+
+pub(crate) fn give_red_orbs(orbs: u32) {
+    with_session(|s| {
+        s.red_orbs += orbs;
+    })
+    .unwrap();
+}
