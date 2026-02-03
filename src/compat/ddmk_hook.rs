@@ -1,7 +1,9 @@
 use crate::archipelago::CONNECTED;
 use crate::compat::imgui_bindings::input_rs;
 use crate::constants::ItemCategory;
-use crate::game_manager::{ItemData, with_active_player_data, with_session_read};
+use crate::game_manager::{
+    ItemData, with_active_player_data, with_active_player_data_read, with_session_read,
+};
 use crate::{config, constants, game_manager, utilities};
 use imgui_sys::{ImGuiCond, ImGuiCond_Appearing, ImGuiWindowFlags, ImVec2};
 use randomizer_utilities::dmc::common_ddmk;
@@ -90,6 +92,16 @@ unsafe fn tracking_window() {
                 }
                 common_ddmk::text(format!("Blue Orbs: {}\0", data.blue_orbs));
                 common_ddmk::text(format!("Purple Orbs: {}\0", data.purple_orbs));
+                // HP Trackers
+                with_session_read(|s| {
+                    common_ddmk::text(format!("S HP: {}\0", s.hp));
+                })
+                .unwrap();
+                with_active_player_data_read(|s| {
+                    common_ddmk::text(format!("D Max HP: {}\0", s.max_hp));
+                    common_ddmk::text(format!("D HP: {}\0", s.hp));
+                })
+                .unwrap();
             }
             Err(err) => {
                 log::error!("Failed to read ArchipelagoData: {:?}", err);

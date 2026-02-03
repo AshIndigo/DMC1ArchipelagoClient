@@ -10,9 +10,13 @@ use crate::game_manager::{
 };
 use crate::mapping::MAPPING;
 use crate::save_handler::setup_save_hooks;
+use crate::ui::text_handler;
+use crate::ui::text_handler::ORIGINAL_DRAW_TEXT;
 use crate::utilities::DMC1_ADDRESS;
 use crate::{check_handler, constants, create_hook, save_handler, skill_manager, utilities};
 use minhook::{MH_STATUS, MinHook};
+use randomizer_utilities::read_data_from_address;
+use std::ptr::write;
 use std::sync::atomic::Ordering;
 use std::sync::{LazyLock, OnceLock};
 
@@ -32,12 +36,22 @@ pub(crate) unsafe fn create_hooks() -> Result<(), MH_STATUS> {
             ORIGINAL_SETUP_NEW_SESSION,
             "Setup new session data"
         );
+        create_hook!(
+            text_handler::DRAW_TEXT_ADDR,
+            text_handler::draw_text_hook,
+            ORIGINAL_DRAW_TEXT,
+            "Draw text"
+        );
     }
     Ok(())
 }
 
 static HOOK_ADDRESSES: LazyLock<Vec<usize>> = LazyLock::new(|| {
-    let mut addrs = vec![LOAD_ROOM_ADDR, SETUP_NEW_SESSION_ADDR];
+    let mut addrs = vec![
+        LOAD_ROOM_ADDR,
+        SETUP_NEW_SESSION_ADDR,
+        text_handler::DRAW_TEXT_ADDR,
+    ];
     check_handler::add_hooks_to_list(&mut addrs);
     save_handler::add_hooks_to_list(&mut addrs);
     addrs
@@ -90,10 +104,10 @@ static ORIGINAL_LOAD_ROOM: OnceLock<BasicNothingFunc> = OnceLock::new();
 // So everything will be appropriately set when loading into a mission
 fn load_room() {
     log::info!("Loading room!");
+    set_max_hp_and_magic();
     if let Some(func) = ORIGINAL_LOAD_ROOM.get() {
         unsafe { func() }
     }
-    set_max_hp_and_magic();
     set_weapons_in_inv();
     set_equipment();
     set_relevant_key_items();
@@ -101,9 +115,9 @@ fn load_room() {
 }
 
 fn set_max_hp_and_magic() {
-    with_session(|s| {
-        match ARCHIPELAGO_DATA.read() {
-            Ok(data) => {
+    match ARCHIPELAGO_DATA.read() {
+        Ok(data) => {
+            with_session(|s| {
                 s.hp = u8::min(INITIAL_HP + data.blue_orbs as u8, MAX_HP);
                 // TODO DT Unlock option
                 if data.dt_unlocked {
@@ -111,13 +125,36 @@ fn set_max_hp_and_magic() {
                 } else {
                     s.magic = INITIAL_MAGIC
                 }
+            })
+            .unwrap();
+            let something = read_data_from_address::<usize>(*DMC1_ADDRESS + 0x60b0d8);
+            let something_hp = something + 0x98;
+            unsafe {
+                write(something_hp as *mut u8, INITIAL_HP + data.blue_orbs as u8);
             }
-            Err(err) => {
-                log::error!("Failed to read data from ARCHIPELAGO_DATA: {}", err);
+            let something_magic = something + 0xA3;
+            unsafe {
+                write(
+                    something_magic as *mut u8,
+                    INITIAL_MAGIC + data.purple_orbs as u8,
+                );
             }
+            with_active_player_data(|d| {
+                d.max_hp = u8::min(INITIAL_HP + data.blue_orbs as u8, MAX_HP) as u16 * 100;
+                if data.dt_unlocked {
+                    d.max_magic_human = u8::min(data.purple_orbs as u8, MAX_MAGIC) as u16 * 120;
+                    d.max_magic_demon = u8::min(data.purple_orbs as u8, MAX_MAGIC) as u16 * 200;
+                } else {
+                    d.max_magic_human = INITIAL_MAGIC as u16;
+                    d.max_magic_demon = INITIAL_MAGIC as u16;
+                }
+            })
+            .unwrap();
         }
-    })
-    .unwrap();
+        Err(err) => {
+            log::error!("Failed to read data from ARCHIPELAGO_DATA: {}", err);
+        }
+    }
 }
 
 fn set_equipment() {

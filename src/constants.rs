@@ -154,7 +154,7 @@ pub(crate) const ALL_ITEMS: [Item; 51] = [
     },
     Item {
         id: 3,
-        name: "Mystery orb!",
+        name: "Mystery orb!", // White Mystery Orb
         category: 2,
         mission: None,
         group: ItemCategory::Misc,
@@ -189,7 +189,7 @@ pub(crate) const ALL_ITEMS: [Item; 51] = [
     },
     Item {
         id: 8,
-        name: "Mystery Orb!",
+        name: "Purple Orb", // Black Mystery Orb
         category: 2,
         mission: None,
         group: ItemCategory::Misc,

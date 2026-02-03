@@ -1,11 +1,14 @@
 use crate::archipelago::CONNECTED;
+use crate::ui::text_handler;
 use crate::{mapping, utilities};
 use archipelago_rs::LocatedItem;
 use randomizer_utilities::dmc::loader_parser::LOADER_STATUS;
 use randomizer_utilities::ui::dx11::{ORIGINAL_PRESENT, ORIGINAL_RESIZE_BUFFERS};
-use randomizer_utilities::ui::font_handler::{FontAtlas, FontColorCB, GREEN, RED, WHITE};
+use randomizer_utilities::ui::dx11_state_guard;
+use randomizer_utilities::ui::font_handler::{
+    FontAtlas, FontColorCB, GREEN, RED, WHITE, YELLOW, draw_string,
+};
 use randomizer_utilities::ui::overlay::{D3D11State, STATE, get_resources};
-use randomizer_utilities::ui::{dx11_state_guard, font_handler};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex, RwLockReadGuard};
@@ -160,7 +163,7 @@ fn draw_overlay(screen_width: f32, screen_height: f32, state: &RwLockReadGuard<D
         && let Some(atlas) = &state.atlas
     {
         const STATUS: &str = "Status: ";
-        font_handler::draw_string(
+        draw_string(
             state,
             STATUS,
             0.0,
@@ -170,7 +173,7 @@ fn draw_overlay(screen_width: f32, screen_height: f32, state: &RwLockReadGuard<D
             get_default_color(),
         );
         let connected = CONNECTED.load(Ordering::SeqCst);
-        font_handler::draw_string(
+        draw_string(
             state,
             if connected {
                 "Connected"
@@ -191,7 +194,7 @@ fn draw_overlay(screen_width: f32, screen_height: f32, state: &RwLockReadGuard<D
         // TODO Modify this text
         const NO_PURCHASE: &str = "Cannot purchase upgrades";
         const NO_PURCHASE_L2: &str = "due to world settings";
-        font_handler::draw_string(
+        draw_string(
             state,
             NO_PURCHASE,
             480.0
@@ -205,7 +208,7 @@ fn draw_overlay(screen_width: f32, screen_height: f32, state: &RwLockReadGuard<D
             screen_height,
             &WHITE,
         );
-        font_handler::draw_string(
+        draw_string(
             state,
             NO_PURCHASE_L2,
             480.0
@@ -220,6 +223,50 @@ fn draw_overlay(screen_width: f32, screen_height: f32, state: &RwLockReadGuard<D
             &WHITE,
         );
         CANT_PURCHASE.store(false, Ordering::SeqCst);
+    }
+
+    if let Ok(res) = text_handler::FOUND_ITEM.read().as_ref()
+        && let Some(item) = &**res
+        && let Some(atlas) = &state.atlas
+    {
+        let rec_name = item.receiver().alias();
+        const START_X: f32 = 900.0;
+        const START_Y: f32 = 700.0;
+        draw_string(
+            state,
+            rec_name,
+            START_X,
+            START_Y,
+            screen_width,
+            screen_height,
+            &YELLOW,
+        );
+        draw_string(
+            state,
+            "'s ",
+            START_X
+                + (rec_name
+                    .chars()
+                    .map(|c| atlas.glyph_advance(c))
+                    .sum::<f32>()),
+            START_Y,
+            screen_width,
+            screen_height,
+            &WHITE,
+        );
+        draw_string(
+            state,
+            &item.item().name(),
+            START_X
+                + (format!("{}'s ", rec_name)
+                    .chars()
+                    .map(|c| atlas.glyph_advance(c))
+                    .sum::<f32>()),
+            START_Y,
+            screen_width,
+            screen_height,
+            &get_color_for_item(item),
+        );
     }
 
     pop_buffer_message();
@@ -252,7 +299,7 @@ fn draw_version_info(
     const GAME_VERSION: &str = "Game Version:";
     const ADDITIONAL_MODS: &str = "Additional Mods:";
     // TODO Maybe at some point I'd want to have the mod poke github on launch?
-    font_handler::draw_string(
+    draw_string(
         state,
         &format!("{} {}", MOD_VERSION, env!("CARGO_PKG_VERSION")),
         0.0,
@@ -267,7 +314,7 @@ fn draw_version_info(
         && let Ok(mapping) = mapping::OVERLAY_INFO.read()
     {
         if let Some(cv) = &mapping.client_version {
-            font_handler::draw_string(
+            draw_string(
                 state,
                 &format!("{} {}", AP_VERSION, cv),
                 0.0,
@@ -279,7 +326,7 @@ fn draw_version_info(
             );
         }
         if let Some(gv) = &mapping.generated_version {
-            font_handler::draw_string(
+            draw_string(
                 state,
                 &format!("{} {}", ROOM_VERSION, gv),
                 0.0,
@@ -292,7 +339,7 @@ fn draw_version_info(
         }
     }
     if let Some(status) = LOADER_STATUS.get() {
-        font_handler::draw_string(
+        draw_string(
             state,
             GAME_VERSION,
             0.0,
@@ -301,7 +348,7 @@ fn draw_version_info(
             screen_height,
             &WHITE,
         );
-        font_handler::draw_string(
+        draw_string(
             state,
             &format!(" {}", status.game_information.description),
             GAME_VERSION
@@ -317,7 +364,7 @@ fn draw_version_info(
                 &RED
             },
         );
-        font_handler::draw_string(
+        draw_string(
             state,
             ADDITIONAL_MODS,
             0.0,
@@ -328,7 +375,7 @@ fn draw_version_info(
         );
         for (i, mod_info) in status.mod_information.iter().enumerate() {
             let base = 350;
-            font_handler::draw_string(
+            draw_string(
                 state,
                 mod_info.description,
                 0.0,
@@ -380,7 +427,7 @@ fn draw_colored_message(
     let mut cursor_x = screen_width - total_width;
 
     for segment in msg.message.segments.iter() {
-        font_handler::draw_string(
+        draw_string(
             state,
             &segment.text,
             cursor_x,

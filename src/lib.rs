@@ -22,7 +22,6 @@ mod location_handler;
 mod mapping;
 mod save_handler;
 mod skill_manager;
-mod text_handler;
 mod ui;
 mod utilities;
 

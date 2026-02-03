@@ -3,6 +3,7 @@ use crate::constants::{
 };
 use crate::game_manager::{ItemData, get_mission, get_room, get_track, with_session_read};
 use crate::mapping::CACHED_LOCATIONS;
+use crate::ui::text_handler;
 use crate::utilities::{DMC1_ADDRESS, clear_item_slot};
 use crate::{constants, create_hook, hook, location_handler};
 use minhook::MH_STATUS;
@@ -127,15 +128,9 @@ pub fn item_pickup() {
                         match location_handler::get_location_name_by_data(&received_item, client) {
                             Ok(loc_key) => {
                                 // Get the AP item data for that location
-                                let item_name = CACHED_LOCATIONS
-                                    .read()
-                                    .unwrap()
-                                    .get(loc_key)
-                                    .unwrap()
-                                    .item()
-                                    .name();
-                                log::debug!("Actual item name is {item_name}");
-                                // TODO Need to properly display what the item actually is. Right now this actually tricks the game into giving the displayed item
+                                let map = CACHED_LOCATIONS.read().unwrap();
+                                let located_item = map.get(loc_key).unwrap();
+                                log::debug!("Actual item name is {}", located_item.item().name());
                                 let data = location_handler::get_mapped_data(loc_key).unwrap();
                                 unsafe {
                                     randomizer_utilities::replace_single_byte(
@@ -146,6 +141,10 @@ pub fn item_pickup() {
                                         pickup_offset + CATEGORY_OFFSET,
                                         data.category,
                                     );
+                                }
+                                text_handler::REPLACE_TEXT.store(true, Ordering::Relaxed);
+                                if let Ok(mut txt) = text_handler::FOUND_ITEM.write() {
+                                    *txt = Some(located_item.clone());
                                 }
                             }
                             Err(err) => {
@@ -312,6 +311,7 @@ pub fn purchase_item() {
             orig();
         }
     }
+    // TODO Need to stop giving the original item/skill
     if with_session_read(|session| session.red_orbs).unwrap() < orig_red_orbs {
         let data_addr: usize = read_data_from_address(*DMC1_ADDRESS + WEAPON_DATA);
         let idx: u8 = read_data_from_address(data_addr + PURCHASE_IDX_OFFSET);

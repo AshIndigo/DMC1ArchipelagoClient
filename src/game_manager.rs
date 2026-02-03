@@ -5,6 +5,7 @@ use randomizer_utilities::read_data_from_address;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::mem::transmute;
+use std::ptr::write;
 use std::sync::{LazyLock, RwLock, RwLockWriteGuard};
 
 #[derive(Debug, Default)]
@@ -33,7 +34,7 @@ impl ArchipelagoData {
     }
 
     pub(crate) fn add_blue_orb(&mut self) {
-        self.blue_orbs = (self.blue_orbs + 1).min(14);
+        self.blue_orbs = (self.blue_orbs + 1).min(20);
     }
 
     pub(crate) fn add_purple_orb(&mut self) {
@@ -357,6 +358,13 @@ pub(crate) fn give_hp(blue_orb_count: i32) {
     }) {
         log::error!("Failed to give hp: {:?}", e);
     }
+    let something_hp = read_data_from_address::<usize>(*DMC1_ADDRESS + 0x60b0d8) + 0x98;
+    unsafe {
+        write(
+            something_hp as *mut u8,
+            read_data_from_address::<u8>(something_hp) + blue_orb_count as u8,
+        );
+    }
     if let Err(e) = with_active_player_data(|d| {
         d.hp += blue_orb_count as u16 * 100;
         d.max_hp += blue_orb_count as u16 * 100;
@@ -366,10 +374,18 @@ pub(crate) fn give_hp(blue_orb_count: i32) {
 }
 
 pub(crate) fn give_magic(purple_orb_count: i32, data: &RwLockWriteGuard<ArchipelagoData>) {
+    // TODO Check if I have DT?
     if let Err(e) = with_session(|s| {
         s.magic += purple_orb_count as u8;
     }) {
         log::error!("Failed to give magic: {:?}", e);
+    }
+    let something_magic = read_data_from_address::<usize>(*DMC1_ADDRESS + 0x60b0d8) + 0xA3;
+    unsafe {
+        write(
+            something_magic as *mut u8,
+            read_data_from_address::<u8>(something_magic) + purple_orb_count as u8,
+        );
     }
     if let Err(e) = with_active_player_data(|d| {
         d.magic_human += purple_orb_count as u16 * 120;
@@ -401,7 +417,8 @@ pub(crate) fn kill_dante() {
     .unwrap();
 }
 
-pub static ADD_ORB_FUNC: LazyLock<extern "C" fn(i32)> =
+// Most likely un-needed, but may as well keep around
+pub static _ADD_ORB_FUNC: LazyLock<extern "C" fn(i32)> =
     LazyLock::new(|| unsafe { transmute::<usize, extern "C" fn(i32)>(*DMC1_ADDRESS + 0x3d1760) });
 
 pub static CHANGE_EQUIPPED_GUN: LazyLock<extern "C" fn(u32)> =

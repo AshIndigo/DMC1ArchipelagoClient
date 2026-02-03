@@ -1,8 +1,6 @@
 use crate::check_handler::{Location, LocationType, TX_LOCATION};
 use crate::constants::*;
-use crate::game_manager::{
-    ADD_ORB_FUNC, ARCHIPELAGO_DATA, ArchipelagoData, get_mission, with_session,
-};
+use crate::game_manager::{ARCHIPELAGO_DATA, ArchipelagoData, get_mission, with_session};
 use crate::mapping::{DeathlinkSetting, Goal, MAPPING, Mapping, OVERLAY_INFO, OverlayInfo};
 use crate::ui::overlay;
 use crate::ui::overlay::{MessageSegment, MessageType, OverlayMessage};
@@ -19,7 +17,7 @@ use std::error::Error;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 pub(crate) static CONNECTED: AtomicBool = AtomicBool::new(false);
 pub static TX_DEATHLINK: OnceLock<Sender<DeathLinkData>> = OnceLock::new();
@@ -230,7 +228,7 @@ pub(crate) fn handle_received_items_packet(
                             overlay::get_color_for_item(item.as_ref()),
                         ),
                         MessageSegment::new(" from ".to_string(), WHITE),
-                        MessageSegment::new(item.sender().name().parse()?, YELLOW),
+                        MessageSegment::new(item.sender().alias().parse()?, YELLOW),
                     ];
                     overlay::add_message(OverlayMessage::new(
                         rec_msg,
@@ -261,13 +259,13 @@ pub(crate) fn handle_received_items_packet(
                     }
                     6 => {
                         data.add_blue_orb();
-                        ADD_ORB_FUNC(0);
-                        //game_manager::give_hp(1);
+                        //ADD_ORB_FUNC(0);
+                        game_manager::give_hp(1);
                     }
                     7 => {
                         data.add_purple_orb();
-                        ADD_ORB_FUNC(1);
-                        //game_manager::give_magic(1, &data);
+                        //ADD_ORB_FUNC(1);
+                        game_manager::give_magic(1, &data);
                     }
                     8..12 => {
                         // Weapons
@@ -293,10 +291,10 @@ pub(crate) fn handle_received_items_packet(
                     39 => {
                         // DT Unlock
                         data.add_dt();
-                        for _ in 0..3 {
-                            ADD_ORB_FUNC(1);
-                        }
-                        //game_manager::give_magic(3, &data);
+                        // for _ in 0..3 {
+                        //     ADD_ORB_FUNC(1);
+                        // }
+                        game_manager::give_magic(3, &data);
                     }
                     18..39 => {
                         // For key items
