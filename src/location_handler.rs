@@ -102,6 +102,11 @@ pub fn get_mapped_data(location_name: &str) -> Result<ItemData, Box<dyn Error>> 
             *REMOTE_ID
         }
     };
+    // Red Orbs
+    if 43 >= id && id > 40 {
+        return Ok(*ITEM_DATA_MAP.get("Red Orb - 1").unwrap());
+    }
+
     // To set the displayed graphic to the corresponding weapon
     if id >= 100 {
         return Ok(match id {

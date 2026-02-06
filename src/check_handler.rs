@@ -4,6 +4,7 @@ use crate::constants::{
 use crate::game_manager::{ItemData, get_mission, get_room, get_track, with_session_read};
 use crate::mapping::CACHED_LOCATIONS;
 use crate::ui::text_handler;
+use crate::ui::text_handler::REPLACE_TEXT;
 use crate::utilities::{DMC1_ADDRESS, clear_item_slot};
 use crate::{constants, create_hook, hook, location_handler};
 use minhook::MH_STATUS;
@@ -142,7 +143,8 @@ pub fn item_pickup() {
                                         data.category,
                                     );
                                 }
-                                text_handler::REPLACE_TEXT.store(true, Ordering::Relaxed);
+
+                                REPLACE_TEXT.store(true, Ordering::Relaxed);
                                 if let Ok(mut txt) = text_handler::FOUND_ITEM.write() {
                                     *txt = Some(located_item.clone());
                                 }

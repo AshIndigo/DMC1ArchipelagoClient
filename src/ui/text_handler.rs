@@ -1,5 +1,9 @@
+use crate::utilities::DMC1_ADDRESS;
 use archipelago_rs::LocatedItem;
+use randomizer_utilities::archipelago_utilities::get_description;
+use randomizer_utilities::{modify_protected_memory, read_data_from_address};
 use std::collections::HashMap;
+use std::ptr::{copy_nonoverlapping, write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, OnceLock, RwLock};
 
@@ -148,90 +152,108 @@ pub fn translate_string(input: String) -> Vec<u8> {
     res
 }
 const NORMAL_TEXT: u8 = 0x9;
-const SLOW_TEXT: u8 = 0xA;
+// Only useful when actively printing text
+const _SLOW_TEXT: u8 = 0xA;
 const WHITE: u8 = 0;
 const RED: u8 = 1;
 const GREEN: u8 = 2;
 const BLUE: u8 = 3;
 
+// 0x7e 0x06 is a closer space?
+
 #[repr(C)]
 #[derive(Clone)]
-struct TextInfo {
-    spacer: [u8; 5],
+pub struct TextInfo {
+    spacer: u8,
     text_type: u8,
     color: u8,
     text: Vec<u8>,
     end_chars: [u8; 2],
 }
 impl TextInfo {
-    fn new(text: String) -> TextInfo {
+    pub(crate) fn new(text: String, color: u8) -> TextInfo {
         TextInfo {
-            spacer: [0x7E, 0x0E, 0xFF, 0xFF, 0x7E],
+            spacer: 0x7E,
             text_type: NORMAL_TEXT,
-            color: BLUE,
+            color,
             text: translate_string(text),
             end_chars: [0x7E, 0x0E],
         }
     }
 
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut res = vec![];
-        res.extend(self.spacer);
-        res.push(self.text_type);
-        res.push(self.color);
-        res.extend(self.text.clone());
-        //res.extend(self.end_chars);
-        res.into()
+    pub(crate) fn to_bytes(&self) -> [u8; 256] {
+        let mut res = [0u8; 256];
+        let mut i = 0;
+
+        res[i] = self.spacer;
+        i += 1;
+
+        res[i] = self.text_type;
+        i += 1;
+
+        res[i] = self.color;
+        i += 1;
+
+        let text_len = self.text.len().min(256 - i);
+        res[i..i + text_len].copy_from_slice(&self.text[..text_len]);
+
+        res
+    }
+
+    pub fn get_length(&self) -> usize {
+        5 + self.text.len() - 2
     }
 }
 
 pub static REPLACE_TEXT: AtomicBool = AtomicBool::new(false);
-// TODO Need to set this to None, once the item get screen is closed
 pub static FOUND_ITEM: RwLock<Option<LocatedItem>> = RwLock::new(None);
 
-pub const DRAW_TEXT_ADDR: usize = 0x2669a0;
+pub const DRAW_TEXT_ADDR: usize = 0x2661f0;
 pub static ORIGINAL_DRAW_TEXT: OnceLock<unsafe extern "C" fn(usize)> = OnceLock::new();
-static TEXT: LazyLock<RwLock<TextInfo>> =
-    LazyLock::new(|| RwLock::new(TextInfo::new("Test hi!\nHello!".to_owned())));
-pub fn draw_text_hook(fuck: usize) {
-    if let Some(orig) = ORIGINAL_DRAW_TEXT.get() {
-        // let param_1 = read_data_from_address::<usize>(*DMC1_ADDRESS + 0x60aff8);
-        // let arr = TEXT.read().unwrap().to_bytes();
-        // let len = &arr.len();
-        unsafe {
-            // if REPLACE_TEXT.load(Ordering::Relaxed) {
-            //     copy_nonoverlapping(
-            //         arr.as_ptr(),
-            //         (read_data_from_address::<usize>(param_1 + 0x7c80) - len - 1) as *mut u8,
-            //         *len,
-            //     );
-            //     REPLACE_TEXT.store(false, Ordering::Relaxed);
-            // }
-            if !REPLACE_TEXT.load(Ordering::Relaxed) {
-                orig(fuck)
-            }
-        }
-    } else {
-        panic!("Original draw text not found")
-    }
-}
-
-/*
 pub fn draw_text_hook(param_1: usize) {
     if let Some(orig) = ORIGINAL_DRAW_TEXT.get() {
-        let arr = TEXT.read().unwrap().to_bytes();
-        let len = &arr.len();
         unsafe {
-            if REPLACE_TEXT.load(Ordering::Relaxed) {
-                copy_nonoverlapping(
-                    arr.as_ptr(),
-                    (read_data_from_address::<usize>(param_1 + 0x7c80) - len - 1) as *mut u8,
-                    *len,
-                );
-                REPLACE_TEXT.store(false, Ordering::Relaxed);
-            }
             orig(param_1);
+            if REPLACE_TEXT.load(Ordering::Relaxed) {
+                REPLACE_TEXT.store(false, Ordering::Relaxed);
+                const MAX_LENGTH: usize = 256;
+
+                let text = if let Some(item) = FOUND_ITEM.read().unwrap().as_ref() {
+                    TextInfo::new(
+                        format!("AP Item\n{}", get_description(item)),
+                        match (item.is_trap(), item.is_useful(), item.is_progression()) {
+                            (true, _, _) => RED,
+                            (false, _, true) => BLUE,
+                            (false, true, false) => GREEN,
+                            (false, false, false) => WHITE,
+                        },
+                    )
+                } else {
+                    TextInfo::new("Error\nFound Item was\nnot properly\nset.".to_string(), RED)
+                };
+                let arr: [u8; MAX_LENGTH] = text.to_bytes();
+
+                let dst_addr = *DMC1_ADDRESS + 0x4cb3a88 + 0x18;
+                let dst = dst_addr as *mut u8;
+                modify_protected_memory(
+                    || {
+                        let text_range = read_data_from_address::<usize>(*DMC1_ADDRESS + 0x60AFF8);
+                        write(
+                            // Edit the range of text to be drawn
+                            (text_range + 0x7C98) as *mut usize,
+                            // Get the start of the range, then add on our text length
+                            read_data_from_address::<usize>(text_range + 0x7C90)
+                                + text.get_length(),
+                        );
+                        // Clear old bytes, probably not needed, oh well
+                        std::ptr::write_bytes(dst, 0, MAX_LENGTH);
+                        // Actually put in our new text
+                        copy_nonoverlapping(arr.as_ptr(), dst, MAX_LENGTH);
+                    },
+                    dst,
+                )
+                .unwrap();
+            }
         }
     }
 }
- */

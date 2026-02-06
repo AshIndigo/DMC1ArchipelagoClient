@@ -1,12 +1,11 @@
 use crate::archipelago::CONNECTED;
-use crate::ui::text_handler;
 use crate::{mapping, utilities};
 use archipelago_rs::LocatedItem;
 use randomizer_utilities::dmc::loader_parser::LOADER_STATUS;
 use randomizer_utilities::ui::dx11::{ORIGINAL_PRESENT, ORIGINAL_RESIZE_BUFFERS};
 use randomizer_utilities::ui::dx11_state_guard;
 use randomizer_utilities::ui::font_handler::{
-    FontAtlas, FontColorCB, GREEN, RED, WHITE, YELLOW, draw_string,
+    FontAtlas, FontColorCB, GREEN, RED, WHITE, draw_string,
 };
 use randomizer_utilities::ui::overlay::{D3D11State, STATE, get_resources};
 use std::collections::VecDeque;
@@ -223,50 +222,6 @@ fn draw_overlay(screen_width: f32, screen_height: f32, state: &RwLockReadGuard<D
             &WHITE,
         );
         CANT_PURCHASE.store(false, Ordering::SeqCst);
-    }
-
-    if let Ok(res) = text_handler::FOUND_ITEM.read().as_ref()
-        && let Some(item) = &**res
-        && let Some(atlas) = &state.atlas
-    {
-        let rec_name = item.receiver().alias();
-        const START_X: f32 = 900.0;
-        const START_Y: f32 = 700.0;
-        draw_string(
-            state,
-            rec_name,
-            START_X,
-            START_Y,
-            screen_width,
-            screen_height,
-            &YELLOW,
-        );
-        draw_string(
-            state,
-            "'s ",
-            START_X
-                + (rec_name
-                    .chars()
-                    .map(|c| atlas.glyph_advance(c))
-                    .sum::<f32>()),
-            START_Y,
-            screen_width,
-            screen_height,
-            &WHITE,
-        );
-        draw_string(
-            state,
-            &item.item().name(),
-            START_X
-                + (format!("{}'s ", rec_name)
-                    .chars()
-                    .map(|c| atlas.glyph_advance(c))
-                    .sum::<f32>()),
-            START_Y,
-            screen_width,
-            screen_height,
-            &get_color_for_item(item),
-        );
     }
 
     pop_buffer_message();
