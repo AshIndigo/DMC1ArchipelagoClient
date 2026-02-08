@@ -454,7 +454,6 @@ pub(crate) enum Difficulty {
 #[derive(Debug)]
 pub struct ItemEntry {
     // Represents an item on the ground
-    pub _offset: usize,   // Offset for the item table // TODO Can be removed?
     pub room_number: i32, // Room number
     pub track_number: i32,
     pub item_id: u32, // Default Item ID

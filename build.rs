@@ -21,7 +21,6 @@ fn main() {
     output.push_str("pub static ITEM_MISSION_MAP: LazyLock<HashMap<&'static str, ItemEntry>> = LazyLock::new(|| {
     HashMap::from([\n");
     for (key, value) in data.as_object().expect("Expected JSON object") {
-        let offset = value["offset"].as_u64().unwrap();
         let mission_number = value["mission_number"].as_u64().unwrap();
         let room = value["room_number"].as_u64().unwrap();
         let track = value["track_number"].as_u64().unwrap();
@@ -30,8 +29,8 @@ fn main() {
         let y_coord = value["yCoord"].as_u64().unwrap();
         let z_coord = value["zCoord"].as_u64().unwrap();
         output.push_str(&format!(
-            r#"        ("{}", ItemEntry {{ offset: {}, mission: {}, room_number: {}, track_number: {}, item_id: {}, coordinates: "#,
-            key, offset, mission_number, room, track, item_id
+            r#"        ("{}", ItemEntry {{ mission: {}, room_number: {}, track_number: {}, item_id: {}, coordinates: "#,
+            key, mission_number, room, track, item_id
         ));
         if x_coord != 0 {
             output.push_str(&format!(

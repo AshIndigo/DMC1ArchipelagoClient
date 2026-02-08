@@ -7,6 +7,7 @@ use crate::ui::text_handler;
 use crate::ui::text_handler::REPLACE_TEXT;
 use crate::utilities::{DMC1_ADDRESS, clear_item_slot};
 use crate::{constants, create_hook, hook, location_handler};
+use archipelago_rs::LocatedItem;
 use minhook::MH_STATUS;
 use minhook::MinHook;
 use randomizer_utilities::read_data_from_address;
@@ -120,7 +121,7 @@ pub fn item_pickup() {
                 coordinates: EMPTY_COORDINATES,
             };
             // Send off information
-            send_off_location_coords(received_item, 2);
+            send_off_location_coords(received_item);
 
             // Figure out which location we are at for replacement purposes
             match crate::AP_CORE.get().unwrap().lock() {
@@ -143,7 +144,6 @@ pub fn item_pickup() {
                                         data.category,
                                     );
                                 }
-
                                 REPLACE_TEXT.store(true, Ordering::Relaxed);
                                 if let Ok(mut txt) = text_handler::FOUND_ITEM.write() {
                                     *txt = Some(located_item.clone());
@@ -191,10 +191,10 @@ pub fn setup_check_hooks() -> Result<(), MH_STATUS> {
             "Add item to inventory"
         );
         create_hook!(
-            DISPLAY_ITEMS_ADDR,
-            display_inventory,
-            ORIGINAL_DISPLAY_ITEMS,
-            "???"
+            SORT_INVENTORY,
+            sort_inventory,
+            ORIGINAL_SORT_INVENTORY,
+            "Sorts the inventory after adding an item"
         );
         create_hook!(
             MISSION_COMPLETE_ADDR,
@@ -216,7 +216,7 @@ pub(crate) fn add_hooks_to_list(addrs: &mut Vec<usize>) {
     const ADDRESSES: [usize; 5] = [
         ITEM_PICKUP_ADDR,
         ADD_ITEM_ADDR,
-        DISPLAY_ITEMS_ADDR,
+        SORT_INVENTORY,
         MISSION_COMPLETE_ADDR,
         PURCHASE_ITEM_ADDR,
     ];
@@ -231,6 +231,11 @@ pub fn add_item_to_inv(category: u8, id: u8, count: u16) {
     if let Some(func) = ORIGINAL_ADD_ITEM.get() {
         unsafe { func(category, id, count) };
     }
+    if (category == 2 && id == 8) || (category == 5 && id == 4) {
+        log::debug!("Taking un-needed item");
+        LAST_ID.store(id, Ordering::Relaxed);
+        LAST_CATEGORY.store(category, Ordering::Relaxed);
+    }
     let name = find_item_by_vals(id, category).unwrap();
     if !hook::is_item_relevant_to_mission(name) {
         log::debug!("{name} isn't relevant to current mission");
@@ -243,12 +248,12 @@ const NOTHING: u8 = u8::MAX;
 static LAST_ID: AtomicU8 = AtomicU8::new(NOTHING);
 static LAST_CATEGORY: AtomicU8 = AtomicU8::new(NOTHING);
 
-pub const DISPLAY_ITEMS_ADDR: usize = 0x3d7690;
-static ORIGINAL_DISPLAY_ITEMS: OnceLock<BasicNothingFunc> = OnceLock::new();
+pub const SORT_INVENTORY: usize = 0x3d7690;
+static ORIGINAL_SORT_INVENTORY: OnceLock<BasicNothingFunc> = OnceLock::new();
 
 // Runs when the inventory is opened or displayed (i.e picking up an item)
 // Cleans out unneeded items/weapons to prevent potential skips or issues
-pub fn display_inventory() {
+pub fn sort_inventory() {
     let id = LAST_ID.load(Ordering::Relaxed);
     let category = LAST_CATEGORY.load(Ordering::Relaxed);
     if id != NOTHING || category != NOTHING {
@@ -260,7 +265,7 @@ pub fn display_inventory() {
         LAST_ID.store(NOTHING, Ordering::Relaxed);
         LAST_CATEGORY.store(NOTHING, Ordering::Relaxed);
     }
-    if let Some(func) = ORIGINAL_DISPLAY_ITEMS.get() {
+    if let Some(func) = ORIGINAL_SORT_INVENTORY.get() {
         unsafe {
             func();
         }
@@ -284,18 +289,15 @@ fn mission_complete() {
             Difficulty::from_repr(session.difficulty as usize).unwrap(),
             Rank::from_repr(session.rank as usize).unwrap()
         );
-        send_off_location_coords(
-            Location {
-                location_type: LocationType::MissionComplete,
-                item_id: u32::MAX,
-                room: -1,
-                track: -1,
-                mission: (session.mission - 1) as u32,
-                coordinates: EMPTY_COORDINATES,
-                item_category: 0,
-            },
-            u32::MAX,
-        );
+        send_off_location_coords(Location {
+            location_type: LocationType::MissionComplete,
+            item_id: u32::MAX,
+            room: -1,
+            track: -1,
+            mission: (session.mission - 1) as u32,
+            coordinates: EMPTY_COORDINATES,
+            item_category: 0,
+        });
     })
     .unwrap();
 }
@@ -313,7 +315,6 @@ pub fn purchase_item() {
             orig();
         }
     }
-    // TODO Need to stop giving the original item/skill
     if with_session_read(|session| session.red_orbs).unwrap() < orig_red_orbs {
         let data_addr: usize = read_data_from_address(*DMC1_ADDRESS + WEAPON_DATA);
         let idx: u8 = read_data_from_address(data_addr + PURCHASE_IDX_OFFSET);
@@ -327,18 +328,15 @@ pub fn purchase_item() {
                     _ => u8::MAX,
                 };
                 if count != u8::MAX {
-                    send_off_location_coords(
-                        Location {
-                            location_type: LocationType::PurchaseItem,
-                            item_id: idx as u32,
-                            mission: count as u32,
-                            room: 0,
-                            coordinates: EMPTY_COORDINATES,
-                            track: 0,
-                            item_category: category,
-                        },
-                        u32::MAX,
-                    );
+                    send_off_location_coords(Location {
+                        location_type: LocationType::PurchaseItem,
+                        item_id: idx as u32,
+                        mission: count as u32,
+                        room: 0,
+                        coordinates: EMPTY_COORDINATES,
+                        track: 0,
+                        item_category: category,
+                    });
                 }
             }
             // TODO Buying skill checks
@@ -355,13 +353,8 @@ pub fn purchase_item() {
     }
 }
 
-fn send_off_location_coords(loc: Location, to_display: u32) {
+fn send_off_location_coords(loc: Location) {
     if let Some(tx) = TX_LOCATION.get() {
         tx.send(loc).expect("Failed to send Location!");
-        if to_display != u32::MAX {
-            // clear_high_roller();
-            // text_handler::LAST_OBTAINED_ID.store(to_display as u8, SeqCst);
-            //take_away_received_item(loc.item_id);
-        }
     }
 }

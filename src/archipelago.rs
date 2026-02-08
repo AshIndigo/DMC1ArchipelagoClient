@@ -1,4 +1,4 @@
-use crate::check_handler::{Location, LocationType, TX_LOCATION};
+use crate::check_handler::{Location, TX_LOCATION};
 use crate::constants::*;
 use crate::game_manager::{ARCHIPELAGO_DATA, ArchipelagoData, get_mission, with_session};
 use crate::mapping::{DeathlinkSetting, Goal, MAPPING, Mapping, OVERLAY_INFO, OverlayInfo};
@@ -351,20 +351,10 @@ fn handle_item_receive(
 ) -> Result<(), Box<dyn Error>> {
     // See if there's an item!
     log::info!("Processing item: {}", received_item);
-    if received_item.location_type == LocationType::Standard && received_item.item_id <= 0x39
-    //&& check_handler::should_snatch_item(received_item.item_id)
-    {
-        //take_away_received_item(received_item.item_id);
-    }
     let location_key = location_handler::get_location_name_by_data(&received_item, client)?;
     // Then see if the item picked up matches the specified in the map
     match mapping::CACHED_LOCATIONS.read()?.get(location_key) {
         Some(located_item) => {
-            // location_handler::edit_end_event(location_key); // Needed so a mission will end properly after picking up its trigger.
-            // text_handler::replace_unused_with_text(archipelago_utilities::get_description(
-            //     located_item,
-            // ));
-            // text_handler::CANCEL_TEXT.store(true, Ordering::SeqCst);
             if let Err(arch_err) = client.mark_checked(vec![located_item.location()]) {
                 log::error!("Failed to check location: {}", arch_err);
                 item_sync::add_offline_check(located_item.location().id());
@@ -376,7 +366,7 @@ fn handle_item_receive(
                 *REMOTE_ID
             };
             if let Ok(mut archipelago_data) = ARCHIPELAGO_DATA.write()
-                && in_game_id > 0x14
+                //&& in_game_id > 0x14
                 && in_game_id != *REMOTE_ID
             {
                 archipelago_data.add_item(located_item.item().name().to_string());
