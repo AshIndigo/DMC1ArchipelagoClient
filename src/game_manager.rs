@@ -244,7 +244,7 @@ pub struct PlayerData {
     unknown8: [u8; 114],
     pub(crate) gun: u8,
     unknown9: [u8; 3],
-    melee_form: u8,
+    pub(crate) melee_form: u8,
     unknown10: [u8; 25],
     charge_timer: [i16; 2],
 }
@@ -423,6 +423,9 @@ pub static _ADD_ORB_FUNC: LazyLock<extern "C" fn(i32)> =
 
 pub static CHANGE_EQUIPPED_GUN: LazyLock<extern "C" fn(u32)> =
     LazyLock::new(|| unsafe { transmute::<usize, extern "C" fn(u32)>(*DMC1_ADDRESS + 0x2C4C50) });
+
+pub static CHANGE_MELEE_FORM: LazyLock<extern "C" fn(u32)> =
+    LazyLock::new(|| unsafe { transmute::<usize, extern "C" fn(u32)>(*DMC1_ADDRESS + 0x2C4A00) });
 
 pub static CHANGE_EQUIPPED_MELEE: LazyLock<extern "C" fn(u32, u32)> = LazyLock::new(|| unsafe {
     transmute::<usize, extern "C" fn(u32, u32)>(*DMC1_ADDRESS + 0x2C99C0)

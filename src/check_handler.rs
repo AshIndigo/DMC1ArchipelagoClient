@@ -7,7 +7,6 @@ use crate::ui::text_handler;
 use crate::ui::text_handler::REPLACE_TEXT;
 use crate::utilities::{DMC1_ADDRESS, clear_item_slot};
 use crate::{constants, create_hook, hook, location_handler};
-use archipelago_rs::LocatedItem;
 use minhook::MH_STATUS;
 use minhook::MinHook;
 use randomizer_utilities::read_data_from_address;

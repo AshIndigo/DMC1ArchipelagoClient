@@ -251,7 +251,7 @@ pub(crate) fn handle_received_items_packet(
                             game_manager::give_red_orbs(orbs);
                         }
                     }
-                    1..6 => {
+                    1..=5 => {
                         // Guns
                         utilities::insert_unique_item_into_inv(
                             ITEM_DATA_MAP.get(&&*item.item().name()).unwrap(),
@@ -267,13 +267,13 @@ pub(crate) fn handle_received_items_packet(
                         //ADD_ORB_FUNC(1);
                         game_manager::give_magic(1, &data);
                     }
-                    8..12 => {
+                    8..=11 => {
                         // Weapons
                         utilities::insert_unique_item_into_inv(
                             ITEM_DATA_MAP.get(&&*item.item().name()).unwrap(),
                         )
                     }
-                    12..17 => {
+                    12..=16 => {
                         // Don't add duplicate consumables
                         if item.index() >= CURRENT_INDEX.load(Ordering::SeqCst) as usize {
                             if item.item().id() == 15 {
@@ -296,7 +296,7 @@ pub(crate) fn handle_received_items_packet(
                         // }
                         game_manager::give_magic(3, &data);
                     }
-                    18..39 => {
+                    18..=38 => {
                         // For key items
                         log::debug!("Setting newly acquired key items");
                         match MISSION_ITEM_MAP.get(&(get_mission())) {
@@ -316,7 +316,7 @@ pub(crate) fn handle_received_items_packet(
                             ITEM_DATA_MAP.get(&&*item.item().name()).unwrap(),
                         )
                     }
-                    100..114 => {
+                    100..=113 => {
                         // For skills
                         if client.slot_data().randomize_skills {
                             skill_manager::add_skill(item.item().id() as usize, &mut data);
@@ -411,9 +411,14 @@ fn has_reached_goal(client: &mut Client<Mapping>) -> bool {
     }
 }
 
+const GENERIC_CHECKS: u32 = 40;
+
 /// This is run when a there is a valid connection to a room.
 pub fn run_setup(client: &mut Client<Mapping>) -> Result<(), Box<dyn Error>> {
     log::info!("Running setup");
+    // Shop checks
+    // TODO Hint options
+    mapping::run_scouts_for_mission(client, GENERIC_CHECKS, CreateAsHint::New);
     mapping::run_scouts_for_mission(client, NO_MISSION, CreateAsHint::No);
     for i in 1..=23 {
         mapping::run_scouts_for_mission(client, i, CreateAsHint::No);

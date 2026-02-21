@@ -5,8 +5,8 @@ use crate::constants::{
     get_items_by_category,
 };
 use crate::game_manager::{
-    ARCHIPELAGO_DATA, CHANGE_EQUIPPED_GUN, CHANGE_EQUIPPED_MELEE, with_active_player_data,
-    with_session, with_session_read,
+    ARCHIPELAGO_DATA, CHANGE_EQUIPPED_GUN, CHANGE_EQUIPPED_MELEE, CHANGE_MELEE_FORM, get_room,
+    get_track, with_active_player_data, with_session, with_session_read,
 };
 use crate::mapping::MAPPING;
 use crate::save_handler::setup_save_hooks;
@@ -109,7 +109,9 @@ fn load_room() {
         unsafe { func() }
     }
     set_weapons_in_inv();
-    set_equipment();
+    if get_room() == 33 && get_track() == 1 {
+        set_equipment();
+    }
     set_relevant_key_items();
     skill_manager::set_skills(&ARCHIPELAGO_DATA.read().unwrap());
 }
@@ -157,6 +159,7 @@ fn set_max_hp_and_magic() {
     }
 }
 
+// TODO I think this is still a bit weird. Need to do a proper test of all starting melees. Guns are fine I think
 fn set_equipment() {
     let data = ARCHIPELAGO_DATA.read().unwrap();
     if let Some(mapping) = MAPPING.read().unwrap().as_ref() {
@@ -181,7 +184,16 @@ fn set_equipment() {
                 d.melee = *constants::MELEE_MAP
                     .get_by_left(mapping.start_melee.as_str())
                     .unwrap();
+
+                if d.melee == 4 {
+                    d.melee_form = 1;
+                    CHANGE_MELEE_FORM(1);
+                } else {
+                    d.melee_form = 0;
+                    CHANGE_MELEE_FORM(0);
+                }
                 CHANGE_EQUIPPED_MELEE(d.melee as u32, 0);
+                log::debug!("Setting actor melee to: {}", d.melee)
             }
         })
         .unwrap();
