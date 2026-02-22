@@ -12,7 +12,7 @@ use archipelago_rs::{
 use randomizer_utilities::archipelago_utilities::{DeathLinkData, handle_print};
 use randomizer_utilities::item_sync::CURRENT_INDEX;
 use randomizer_utilities::ui::font_handler::{WHITE, YELLOW};
-use randomizer_utilities::{item_sync, setup_channel_pair};
+use randomizer_utilities::{archipelago_utilities, item_sync, setup_channel_pair};
 use std::error::Error;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -353,7 +353,10 @@ fn handle_item_receive(
     log::info!("Processing item: {}", received_item);
     let location_key = location_handler::get_location_name_by_data(&received_item, client)?;
     // Then see if the item picked up matches the specified in the map
-    match mapping::CACHED_LOCATIONS.read()?.get(location_key) {
+    match archipelago_utilities::CACHED_LOCATIONS
+        .read()?
+        .get(location_key)
+    {
         Some(located_item) => {
             if let Err(arch_err) = client.mark_checked(vec![located_item.location()]) {
                 log::error!("Failed to check location: {}", arch_err);

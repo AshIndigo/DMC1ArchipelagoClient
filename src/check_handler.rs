@@ -2,13 +2,13 @@ use crate::constants::{
     BasicNothingFunc, Coordinates, Difficulty, EMPTY_COORDINATES, Rank, find_item_by_vals,
 };
 use crate::game_manager::{ItemData, get_mission, get_room, get_track, with_session_read};
-use crate::mapping::CACHED_LOCATIONS;
 use crate::ui::text_handler;
 use crate::ui::text_handler::REPLACE_TEXT;
 use crate::utilities::{DMC1_ADDRESS, clear_item_slot};
 use crate::{constants, create_hook, hook, location_handler};
 use minhook::MH_STATUS;
 use minhook::MinHook;
+use randomizer_utilities::archipelago_utilities::CACHED_LOCATIONS;
 use randomizer_utilities::read_data_from_address;
 use std::fmt::{Display, Formatter};
 use std::sync::OnceLock;

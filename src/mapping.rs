@@ -1,13 +1,9 @@
 use crate::data::generated_locations;
-use archipelago_rs::{Client, CreateAsHint, Error, LocatedItem, Location};
-use oneshot::Receiver;
-use randomizer_utilities::APVersion;
+use archipelago_rs::{Client, CreateAsHint, Location};
+use randomizer_utilities::{APVersion, archipelago_utilities};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 use std::sync::{LazyLock, RwLock};
-use std::thread;
-
 pub static OVERLAY_INFO: LazyLock<RwLock<OverlayInfo>> =
     LazyLock::new(|| RwLock::new(OverlayInfo::default()));
 
@@ -169,41 +165,15 @@ pub enum DeathlinkSetting {
     Off,       // Don't send/receive DL related messages
 }
 
-pub static CACHED_LOCATIONS: LazyLock<RwLock<HashMap<String, LocatedItem>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
-
 pub fn run_scouts_for_mission(client: &mut Client<Mapping>, mission: u32, hint: CreateAsHint) {
-    run_scouts(client.scout_locations(get_locations_by_mission(client, mission), hint));
+    archipelago_utilities::run_scouts(
+        client.scout_locations(get_locations_by_mission(client, mission), hint),
+    );
 }
 pub fn run_scouts_for_secret_mission(client: &mut Client<Mapping>) {
-    run_scouts(client.scout_locations(get_secret_missions(client), CreateAsHint::No));
-}
-
-fn run_scouts(future: Receiver<Result<Vec<LocatedItem>, Error>>) {
-    thread::spawn(|| match future.recv() {
-        Ok(scouted) => {
-            parse_scouts(scouted);
-        }
-        Err(err) => log::error!("Failed to run Scouts for: {}", err),
-    });
-}
-
-pub fn parse_scouts(res: Result<Vec<LocatedItem>, Error>) {
-    match res {
-        Ok(items) => match CACHED_LOCATIONS.write() {
-            Ok(mut cached_locations) => {
-                for item in items {
-                    cached_locations.insert(item.location().name().to_string(), item);
-                }
-            }
-            Err(err) => {
-                log::error!("Unable to write to location cache: {}", err)
-            }
-        },
-        Err(err) => {
-            log::error!("Failed to scout: {}", err);
-        }
-    }
+    archipelago_utilities::run_scouts(
+        client.scout_locations(get_secret_missions(client), CreateAsHint::No),
+    );
 }
 
 pub fn get_locations_by_mission(client: &Client<Mapping>, mission: u32) -> Vec<Location> {

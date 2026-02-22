@@ -5,6 +5,7 @@ use crate::game_manager::ItemData;
 use crate::mapping::Mapping;
 use crate::{constants, mapping};
 use archipelago_rs::Client;
+use randomizer_utilities::archipelago_utilities;
 use std::error::Error;
 
 pub fn get_location_name_by_data(
@@ -80,7 +81,7 @@ pub fn get_location_name_by_data(
 
 pub fn get_mapped_data(location_name: &str) -> Result<ItemData, Box<dyn Error>> {
     let mut opt_item = None;
-    let id = match mapping::CACHED_LOCATIONS.read() {
+    let id = match archipelago_utilities::CACHED_LOCATIONS.read() {
         Ok(cached_locations) => {
             if let Some(located_item) = cached_locations.get(location_name) {
                 if located_item.sender() == located_item.receiver() {
