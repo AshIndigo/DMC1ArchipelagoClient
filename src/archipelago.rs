@@ -36,8 +36,8 @@ impl ArchipelagoCore {
         Ok(Self {
             connection: Connection::new(
                 url,
-                game_name,
                 "",
+                Some(game_name),
                 ConnectionOptions::new().receive_items(ItemHandling::OtherWorlds {
                     own_world: true,
                     starting_inventory: true,
