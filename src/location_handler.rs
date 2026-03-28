@@ -1,9 +1,9 @@
 use crate::check_handler::{Location, LocationType};
+use crate::constants;
 use crate::constants::{ITEM_DATA_MAP, REMOTE_ID};
 use crate::data::generated_locations;
 use crate::game_manager::ItemData;
 use crate::mapping::Mapping;
-use crate::constants;
 use archipelago_rs::Client;
 use randomizer_utilities::archipelago_utilities;
 use std::error::Error;

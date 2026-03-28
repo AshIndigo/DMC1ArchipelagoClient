@@ -4,7 +4,7 @@ use crate::utilities::DMC1_ADDRESS;
 use crate::{AP_CORE, archipelago, create_hook};
 use minhook::MH_STATUS;
 use minhook::MinHook;
-use randomizer_utilities::item_sync::{CURRENT_INDEX, SlotSyncInfo};
+use randomizer_utilities::item_sync::{CURRENT_INDEX};
 use randomizer_utilities::{item_sync, read_data_from_address};
 use std::error::Error;
 use std::io::ErrorKind;
@@ -163,27 +163,17 @@ fn load_save_slot(param_1: usize) {
             let client = core.connection.client_mut().unwrap();
             match item_sync::read_save_data() {
                 Ok(sync_data) => {
-                    match sync_data.room_sync_info.get(&item_sync::get_sync_file_key(
-                        client.seed_name(),
-                        client.this_player().name().into(),
-                    )) {
-                        None => {
-                            // Doesn't exist so 0
-                            CURRENT_INDEX.store(0, Ordering::SeqCst);
-                        }
-                        Some(arr) => {
-                            CURRENT_INDEX
-                                .store(arr.sync_index[save_index as usize], Ordering::SeqCst);
-                            *ARCHIPELAGO_DATA.write().unwrap() = ArchipelagoData::default();
-                            if let Err(e) = archipelago::handle_received_items_packet(
-                                arr.sync_index[save_index as usize] as usize,
-                                client,
-                            ) {
-                                log::error!("Failed to handle received items: {:?}", e);
-                            }
-                        }
+                    CURRENT_INDEX
+                        .store(sync_data.sync_index[save_index as usize], Ordering::SeqCst);
+                    *ARCHIPELAGO_DATA.write().unwrap() = ArchipelagoData::default();
+                    if let Err(e) = archipelago::handle_received_items_packet(
+                        sync_data.sync_index[save_index as usize] as usize,
+                        client,
+                    ) {
+                        log::error!("Failed to handle received items: {:?}", e);
                     }
                 }
+
                 Err(err) => {
                     log::error!("Error getting sync data: {}", err);
                 }
@@ -212,29 +202,12 @@ fn save_to_slot(param_1: usize) {
             let client = core.connection.client().unwrap();
             match item_sync::read_save_data() {
                 Ok(mut sync_data) => {
-                    let key = item_sync::get_sync_file_key(
-                        client.seed_name(),
-                        client.this_player().name().into(),
-                    );
-                    match sync_data.room_sync_info.get_mut(&key) {
-                        None => {
-                            // Doesn't exist, need to add
-                            let mut sync_info = SlotSyncInfo::default();
-                            sync_info.sync_index[save_index as usize] =
-                                CURRENT_INDEX.load(Ordering::SeqCst);
-                            sync_info.offline_checks =
-                                item_sync::OFFLINE_CHECKS.lock().unwrap().clone();
-                            sync_data.room_sync_info.insert(key, sync_info);
-                        }
-                        Some(sync_info) => {
-                            sync_info.sync_index[save_index as usize] =
-                                CURRENT_INDEX.load(Ordering::SeqCst);
-                            sync_info.offline_checks =
-                                item_sync::OFFLINE_CHECKS.lock().unwrap().clone();
-                        }
-                    }
+                    sync_data.sync_index[save_index as usize] =
+                        CURRENT_INDEX.load(Ordering::SeqCst);
+                    sync_data.offline_checks = item_sync::OFFLINE_CHECKS.lock().unwrap().clone();
+
                     item_sync::OFFLINE_CHECKS.lock().unwrap().clear();
-                    if let Err(e) = item_sync::write_sync_data_file(sync_data) {
+                    if let Err(e) = item_sync::write_sync_data_file(sync_data, client) {
                         log::error!("Error writing sync data: {}", e);
                     }
                 }
