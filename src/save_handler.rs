@@ -4,7 +4,7 @@ use crate::utilities::DMC1_ADDRESS;
 use crate::{AP_CORE, archipelago, create_hook};
 use minhook::MH_STATUS;
 use minhook::MinHook;
-use randomizer_utilities::item_sync::{CURRENT_INDEX};
+use randomizer_utilities::item_sync::CURRENT_INDEX;
 use randomizer_utilities::{item_sync, read_data_from_address};
 use std::error::Error;
 use std::io::ErrorKind;
@@ -161,7 +161,7 @@ fn load_save_slot(param_1: usize) {
     match AP_CORE.get().unwrap().lock() {
         Ok(mut core) => {
             let client = core.connection.client_mut().unwrap();
-            match item_sync::read_save_data() {
+            match item_sync::read_save_data(client) {
                 Ok(sync_data) => {
                     CURRENT_INDEX
                         .store(sync_data.sync_index[save_index as usize], Ordering::SeqCst);
@@ -200,7 +200,7 @@ fn save_to_slot(param_1: usize) {
     match AP_CORE.get().unwrap().lock() {
         Ok(core) => {
             let client = core.connection.client().unwrap();
-            match item_sync::read_save_data() {
+            match item_sync::read_save_data(client) {
                 Ok(mut sync_data) => {
                     sync_data.sync_index[save_index as usize] =
                         CURRENT_INDEX.load(Ordering::SeqCst);
