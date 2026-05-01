@@ -117,14 +117,7 @@ impl ArchipelagoCore {
                     tags: _,
                     data: _,
                 } => {}
-                Event::DeathLink {
-                    games: _,
-                    slots: _,
-                    tags: _,
-                    time: _,
-                    cause,
-                    source,
-                } => {
+                Event::DeathLink { cause, source, .. } => {
                     overlay::add_message(OverlayMessage::new(
                         vec![MessageSegment::new(
                             format!("{}: {}", source, cause.unwrap_or_default()),
