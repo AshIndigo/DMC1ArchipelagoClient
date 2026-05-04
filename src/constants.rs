@@ -1,6 +1,5 @@
 use crate::game_manager::ItemData;
 use bimap::BiMap;
-use randomizer_utilities::dmc::dmc_constants::GameConfig;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
@@ -493,11 +492,6 @@ pub static MISSION_ITEM_MAP: LazyLock<HashMap<u8, Vec<&'static str>>> = LazyLock
 });
 
 pub const GAME_NAME: &str = "Devil May Cry 1";
-pub struct DMC1Config;
-impl GameConfig for DMC1Config {
-    const REMOTE_ID: u32 = 0x35;
-    const GAME_NAME: &'static str = GAME_NAME;
-}
 
 pub static MELEE_MAP: LazyLock<BiMap<&str, u8>> = LazyLock::new(|| {
     // Alastor??: 0

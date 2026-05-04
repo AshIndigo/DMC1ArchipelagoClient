@@ -3,7 +3,6 @@ use crate::constants::*;
 use crate::game_manager::{ARCHIPELAGO_DATA, ArchipelagoData, get_mission, with_session};
 use crate::mapping::{DeathlinkSetting, Goal, MAPPING, Mapping, OVERLAY_INFO, OverlayInfo};
 use crate::ui::overlay;
-use crate::ui::overlay::{MessageSegment, MessageType, OverlayMessage};
 use crate::{game_manager, hook, location_handler, mapping, skill_manager, utilities};
 use archipelago_rs::{
     AsItemId, Client, ClientStatus, Connection, ConnectionOptions, ConnectionState, CreateAsHint,
@@ -12,6 +11,8 @@ use archipelago_rs::{
 use randomizer_utilities::archipelago_utilities::{DeathLinkData, handle_print};
 use randomizer_utilities::item_sync::CURRENT_INDEX;
 use randomizer_utilities::ui::font_handler::{WHITE, YELLOW};
+use randomizer_utilities::ui::overlay_messages;
+use randomizer_utilities::ui::overlay_messages::{MessageSegment, MessageType, OverlayMessage};
 use randomizer_utilities::{archipelago_utilities, item_sync, setup_channel_pair};
 use std::error::Error;
 use std::sync::OnceLock;
@@ -118,7 +119,7 @@ impl ArchipelagoCore {
                     data: _,
                 } => {}
                 Event::DeathLink { cause, source, .. } => {
-                    overlay::add_message(OverlayMessage::new(
+                    overlay_messages::add_message(OverlayMessage::new(
                         vec![MessageSegment::new(
                             format!("{}: {}", source, cause.unwrap_or_default()),
                             WHITE,
@@ -218,12 +219,12 @@ pub(crate) fn handle_received_items_packet(
                         MessageSegment::new("Received ".to_string(), WHITE),
                         MessageSegment::new(
                             item.item().name().to_string(),
-                            overlay::get_color_for_item(item.as_ref()),
+                            overlay_messages::get_color_for_item(item.as_ref()),
                         ),
                         MessageSegment::new(" from ".to_string(), WHITE),
                         MessageSegment::new(item.sender().alias().parse()?, YELLOW),
                     ];
-                    overlay::add_message(OverlayMessage::new(
+                    overlay_messages::add_message(OverlayMessage::new(
                         rec_msg,
                         Duration::from_secs(3),
                         0.0,

@@ -10,7 +10,7 @@ use randomizer_utilities::dmc::common_ddmk;
 use randomizer_utilities::dmc::common_ddmk::{
     SETUP, checkbox_text, get_orig_render_func, run_common_ddmk_code,
 };
-use randomizer_utilities::dmc::dmc_constants::DDMKHandler;
+use randomizer_utilities::dmc::dmc_helpers::DDMKHandler;
 use randomizer_utilities::{get_base_address, read_data_from_address};
 use std::os::raw::c_char;
 use std::ptr::addr_of;

@@ -1,9 +1,9 @@
 use crate::archipelago::ArchipelagoCore;
-use crate::constants::{BasicNothingFunc, DMC1Config};
+use crate::constants::BasicNothingFunc;
 use crate::utilities::{DMC1_ADDRESS, is_ddmk_loaded};
 use archipelago_rs::{Connection, ConnectionOptions, ItemHandling};
 use minhook::{MH_STATUS, MinHook};
-use randomizer_utilities::dmc::dmc_constants::GameConfig;
+use randomizer_utilities::dmc::dmc_helpers::OverlayHandler;
 use randomizer_utilities::exception_handler;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::{panic, thread};
@@ -56,7 +56,13 @@ pub extern "system" fn DllMain(
             panic::set_hook(Box::new(|info| {
                 log::error!("Panic occurred: {info}");
             }));
-            ui::dx11_hooks::setup_overlay();
+            randomizer_utilities::ui::dx11_hooks::OVERLAY_HANDLER
+                .set(OverlayHandler {
+                    create_device_addr: *DMC1_ADDRESS + 0x407628,
+                    present_fn: ui::overlay::present_hook,
+                })
+                .unwrap();
+            randomizer_utilities::ui::dx11_hooks::setup_overlay();
             // Loader status
             thread::spawn(randomizer_utilities::dmc::loader_parser::set_loader_status);
 
@@ -106,7 +112,7 @@ fn main_loop_hook() {
             .get_or_init(|| {
                 ArchipelagoCore::new(
                     config::CONFIG.connections.get_url(),
-                    DMC1Config::GAME_NAME.parse().unwrap(),
+                    constants::GAME_NAME.parse().unwrap(),
                 )
                 .map(|core| Arc::new(Mutex::new(core)))
                 .unwrap()
@@ -119,7 +125,7 @@ fn main_loop_hook() {
         core.connection = Connection::new(
             config::CONFIG.connections.get_url(),
             "",
-            Some(DMC1Config::GAME_NAME),
+            Some(constants::GAME_NAME),
             ConnectionOptions::new().receive_items(ItemHandling::OtherWorlds {
                 own_world: true,
                 starting_inventory: true,
