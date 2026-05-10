@@ -2,7 +2,6 @@ use crate::check_handler::{Location, TX_LOCATION};
 use crate::constants::*;
 use crate::game_manager::{ARCHIPELAGO_DATA, ArchipelagoData, get_mission, with_session};
 use crate::mapping::{DeathlinkSetting, Goal, MAPPING, Mapping, OVERLAY_INFO, OverlayInfo};
-use crate::ui::overlay;
 use crate::{game_manager, hook, location_handler, mapping, skill_manager, utilities};
 use archipelago_rs::{
     AsItemId, Client, ClientStatus, Connection, ConnectionOptions, ConnectionState, CreateAsHint,
@@ -389,7 +388,7 @@ fn has_reached_goal(client: &mut Client<Mapping>) -> bool {
     match client.slot_data().goal {
         Goal::Standard => chk.any(|loc| loc.name() == "Mission #20 Complete"),
         Goal::All => {
-            for i in 1..20 {
+            for i in 1..=20 {
                 // If we are missing a mission complete check then we cannot goal
                 if !chk.any(|loc| loc.name() == format!("Mission #{} Complete", i).as_str()) {
                     return false;

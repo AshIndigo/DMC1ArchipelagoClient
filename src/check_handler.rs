@@ -21,8 +21,7 @@ pub(crate) static TX_LOCATION: OnceLock<Sender<Location>> = OnceLock::new();
 pub(crate) enum LocationType {
     Standard,
     MissionComplete,
-    // TODO No concept of SS Ranks in DMC1, should I replace with S Rank checks? Or drop it
-    SSRank,
+    SRank,
     PurchaseItem,
 }
 
@@ -250,7 +249,7 @@ static LAST_CATEGORY: AtomicU8 = AtomicU8::new(NOTHING);
 pub const SORT_INVENTORY: usize = 0x3d7690;
 static ORIGINAL_SORT_INVENTORY: OnceLock<BasicNothingFunc> = OnceLock::new();
 
-// Runs when the inventory is opened or displayed (i.e picking up an item)
+// Runs when the inventory is opened or displayed (i.e. picking up an item)
 // Cleans out unneeded items/weapons to prevent potential skips or issues
 pub fn sort_inventory() {
     let id = LAST_ID.load(Ordering::Relaxed);

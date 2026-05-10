@@ -21,8 +21,8 @@ pub fn get_location_name_by_data(
                     LocationType::MissionComplete => {
                         *(*key) == format!("Mission #{} Complete", location_data.mission).as_str()
                     }
-                    LocationType::SSRank => {
-                        *(*key) == format!("Mission #{} SS Rank", location_data.mission).as_str()
+                    LocationType::SRank => {
+                        *(*key) == format!("Mission #{} S Rank", location_data.mission).as_str()
                     }
                     LocationType::PurchaseItem => {
                         *(*key)

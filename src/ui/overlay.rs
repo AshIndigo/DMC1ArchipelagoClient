@@ -1,6 +1,5 @@
 use crate::archipelago::CONNECTED;
 use crate::{mapping, utilities};
-use archipelago_rs::LocatedItem;
 use randomizer_utilities::dmc::loader_parser::LOADER_STATUS;
 use randomizer_utilities::ui::dx11_state::{D3D11State, get_resources, update_screen_size};
 use randomizer_utilities::ui::dx11_state_guard;
