@@ -1,10 +1,10 @@
 use crate::check_handler::{Location, TX_LOCATION};
 use crate::constants::*;
 use crate::game_manager::{ARCHIPELAGO_DATA, ArchipelagoData, get_mission, with_session};
-use crate::mapping::{DeathlinkSetting, Goal, MAPPING, Mapping, OVERLAY_INFO, OverlayInfo};
+use crate::mapping::{DeathlinkSetting, MAPPING, Mapping, OVERLAY_INFO, OverlayInfo};
 use crate::{game_manager, hook, location_handler, mapping, skill_manager, utilities};
 use archipelago_rs::{
-    AsItemId, Client, ClientStatus, Connection, ConnectionOptions, ConnectionState, CreateAsHint,
+    AsItemId, Client, Connection, ConnectionOptions, ConnectionState, CreateAsHint,
     DeathLinkOptions, Event, ItemHandling,
 };
 use randomizer_utilities::archipelago_utilities::{DeathLinkData, handle_print};
@@ -376,35 +376,7 @@ fn handle_item_receive(
         }
         None => Err(anyhow::anyhow!("Location not found: {}", location_key))?,
     }
-    // Add to checked locations
-    if has_reached_goal(client) {
-        client.set_status(ClientStatus::Goal)?
-    }
     Ok(())
-}
-
-fn has_reached_goal(client: &mut Client<Mapping>) -> bool {
-    let mut chk = client.checked_locations();
-    match client.slot_data().goal {
-        Goal::Standard => chk.any(|loc| loc.name() == "Mission #20 Complete"),
-        Goal::All => {
-            for i in 1..=20 {
-                // If we are missing a mission complete check then we cannot goal
-                if !chk.any(|loc| loc.name() == format!("Mission #{} Complete", i).as_str()) {
-                    return false;
-                }
-            }
-            // If we have them all, goal
-            true
-        }
-        Goal::RandomOrder => {
-            if let Some(order) = &client.slot_data().mission_order {
-                return chk
-                    .any(|loc| loc.name() == format!("Mission #{} Complete", order[19]).as_str());
-            }
-            false
-        }
-    }
 }
 
 const GENERIC_CHECKS: u32 = 40;

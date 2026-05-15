@@ -1,19 +1,21 @@
 use crate::constants::{
-    BasicNothingFunc, Coordinates, Difficulty, EMPTY_COORDINATES, Rank, find_item_by_vals,
+    find_item_by_vals, BasicNothingFunc, Coordinates, Difficulty, Rank, EMPTY_COORDINATES,
 };
-use crate::game_manager::{ItemData, get_mission, get_room, get_track, with_session_read};
+use crate::game_manager::{get_mission, get_room, get_track, with_session_read, ItemData};
+use crate::mapping::Mapping;
 use crate::ui::text_handler;
 use crate::ui::text_handler::REPLACE_TEXT;
-use crate::utilities::{DMC1_ADDRESS, clear_item_slot};
-use crate::{constants, create_hook, hook, location_handler};
-use minhook::MH_STATUS;
+use crate::utilities::{clear_item_slot, DMC1_ADDRESS};
+use crate::{constants, create_hook, hook, location_handler, mapping, AP_CORE};
+use archipelago_rs::ClientStatus;
 use minhook::MinHook;
+use minhook::MH_STATUS;
 use randomizer_utilities::archipelago_utilities::CACHED_LOCATIONS;
 use randomizer_utilities::read_data_from_address;
 use std::fmt::{Display, Formatter};
-use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::mpsc::Sender;
+use std::sync::OnceLock;
 
 pub(crate) static TX_LOCATION: OnceLock<Sender<Location>> = OnceLock::new();
 
@@ -122,7 +124,7 @@ pub fn item_pickup() {
             send_off_location_coords(received_item);
 
             // Figure out which location we are at for replacement purposes
-            match crate::AP_CORE.get().unwrap().lock() {
+            match AP_CORE.get().unwrap().lock() {
                 Ok(core) => {
                     if let Some(client) = core.connection.client() {
                         match location_handler::get_location_name_by_data(&received_item, client) {
@@ -281,10 +283,11 @@ fn mission_complete() {
         }
     }
     with_session_read(|session| {
+        let difficulty = Difficulty::from_repr(session.difficulty as usize).unwrap();
         log::debug!(
             "Mission {} Complete - Difficulty: {} - Rank: {}",
             session.mission - 1,
-            Difficulty::from_repr(session.difficulty as usize).unwrap(),
+            difficulty,
             Rank::from_repr(session.rank as usize).unwrap()
         );
         send_off_location_coords(Location {
@@ -296,8 +299,34 @@ fn mission_complete() {
             coordinates: EMPTY_COORDINATES,
             item_category: 0,
         });
+        // Silly
+        if let Ok(mut core) = AP_CORE.get().unwrap().try_lock()
+            && let Some(client) = core.connection.client_mut()
+            && check_goal(client.slot_data(), session.mission, difficulty)
+            && let Err(e) = client.set_status(ClientStatus::Goal)
+        {
+            log::error!("Couldn't goal: {}", e);
+        }
     })
     .unwrap();
+}
+
+// TODO Note: Mission difficulty and rank checks are not implemented
+fn check_goal(mapping: &Mapping, mission: u8, _difficulty: Difficulty) -> bool {
+    match mapping.goal {
+        mapping::Goal::Standard => mission == 23,
+        // All missions for a specific difficulty should have a rank equal to or above the required rank
+        mapping::Goal::All => false,
+        // Same as standard, just checking with mission order instead
+        mapping::Goal::RandomOrder => {
+            if let Some(order) = &mapping.mission_order {
+                mission == order[23]
+            } else {
+                log::error!("Mission Order is None");
+                false
+            }
+        }
+    }
 }
 
 static PURCHASE_ITEM_ADDR: usize = 0x3DF5B0; // Called every attempted purchase
