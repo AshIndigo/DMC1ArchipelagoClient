@@ -1329,5 +1329,148 @@
     "xCoord": 0,
     "yCoord": 0,
     "zCoord": 0
+  },
+  "Purchase Blue Orb #1": {
+    "mission_number": 40,
+    "room_number": 0,
+    "track_number": 0,
+    "default_item": 0,
+    "secret": false,
+    "offset": 0,
+    "xCoord": 0,
+    "yCoord": 0,
+    "zCoord": 0
+  },
+  "Purchase Blue Orb #2": {
+    "mission_number": 40,
+    "room_number": 0,
+    "track_number": 0,
+    "default_item": 0,
+    "secret": false,
+    "offset": 0,
+    "xCoord": 0,
+    "yCoord": 0,
+    "zCoord": 0
+  },
+  "Purchase Blue Orb #3": {
+    "mission_number": 40,
+    "room_number": 0,
+    "track_number": 0,
+    "default_item": 0,
+    "secret": false,
+    "offset": 0,
+    "xCoord": 0,
+    "yCoord": 0,
+    "zCoord": 0
+  },
+  "Purchase Blue Orb #4": {
+    "mission_number": 40,
+    "room_number": 0,
+    "track_number": 0,
+    "default_item": 0,
+    "secret": false,
+    "offset": 0,
+    "xCoord": 0,
+    "yCoord": 0,
+    "zCoord": 0
+  },
+  "Purchase Blue Orb #5": {
+    "mission_number": 40,
+    "room_number": 0,
+    "track_number": 0,
+    "default_item": 0,
+    "secret": false,
+    "offset": 0,
+    "xCoord": 0,
+    "yCoord": 0,
+    "zCoord": 0
+  },
+  "Purchase Blue Orb #6": {
+    "mission_number": 40,
+    "room_number": 0,
+    "track_number": 0,
+    "default_item": 0,
+    "secret": false,
+    "offset": 0,
+    "xCoord": 0,
+    "yCoord": 0,
+    "zCoord": 0
+  },
+  "Purchase Purple Orb #1": {
+    "mission_number": 40,
+    "room_number": 0,
+    "track_number": 0,
+    "default_item": 0,
+    "secret": false,
+    "offset": 0,
+    "xCoord": 0,
+    "yCoord": 0,
+    "zCoord": 0
+  },
+  "Purchase Purple Orb #2": {
+    "mission_number": 40,
+    "room_number": 0,
+    "track_number": 0,
+    "default_item": 0,
+    "secret": false,
+    "offset": 0,
+    "xCoord": 0,
+    "yCoord": 0,
+    "zCoord": 0
+  },
+  "Purchase Purple Orb #3": {
+    "mission_number": 40,
+    "room_number": 0,
+    "track_number": 0,
+    "default_item": 0,
+    "secret": false,
+    "offset": 0,
+    "xCoord": 0,
+    "yCoord": 0,
+    "zCoord": 0
+  },
+  "Purchase Purple Orb #4": {
+    "mission_number": 40,
+    "room_number": 0,
+    "track_number": 0,
+    "default_item": 0,
+    "secret": false,
+    "offset": 0,
+    "xCoord": 0,
+    "yCoord": 0,
+    "zCoord": 0
+  },
+  "Purchase Purple Orb #5": {
+    "mission_number": 40,
+    "room_number": 0,
+    "track_number": 0,
+    "default_item": 0,
+    "secret": false,
+    "offset": 0,
+    "xCoord": 0,
+    "yCoord": 0,
+    "zCoord": 0
+  },
+  "Purchase Purple Orb #6": {
+    "mission_number": 40,
+    "room_number": 0,
+    "track_number": 0,
+    "default_item": 0,
+    "secret": false,
+    "offset": 0,
+    "xCoord": 0,
+    "yCoord": 0,
+    "zCoord": 0
+  },
+  "Purchase Purple Orb #7": {
+    "mission_number": 40,
+    "room_number": 0,
+    "track_number": 0,
+    "default_item": 0,
+    "secret": false,
+    "offset": 0,
+    "xCoord": 0,
+    "yCoord": 0,
+    "zCoord": 0
   }
 }

@@ -3,6 +3,7 @@ use crate::game_manager::ArchipelagoData;
 use std::collections::HashMap;
 use std::ops::BitOrAssign;
 
+use bitflags::bitflags;
 use std::sync::LazyLock;
 
 struct SkillData {
@@ -136,6 +137,28 @@ static SKILLS_MAP: LazyLock<HashMap<&str, SkillData>> = LazyLock::new(|| {
     ])
 });
 static DEFAULT_SKILLS: [u8; 4] = [0x0, 0x0, 0x0, 0x0]; // I should see what else this lets me control...
+
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct Skills: u32 {
+        const _Unknown            = 0b1000_0000_0000_0001_1111_1111_1111_1111;
+        const Alastor_Air_Hike    = 0b0100_0000_0000_0000_0000_0000_0000_0000;
+        const Alastor_Round_Trip  = 0b0010_0000_0000_0000_0000_0000_0000_0000;
+        const Alastor_Stinger_1   = 0b0001_0000_0000_0000_0000_0000_0000_0000;
+        const Alastor_Stinger_2   = 0b0000_1000_0000_0000_0000_0000_0000_0000;
+        const Alastor_Vortex_1    = 0b0000_0100_0000_0000_0000_0000_0000_0000;
+        const Alastor_Vortex_2    = 0b0000_0010_0000_0000_0000_0000_0000_0000;
+        const Alastor_Air_Raid    = 0b0000_0001_0000_0000_0000_0000_0000_0000;
+
+        const Ifrit_Rolling_Blaze = 0b0000_0000_1000_0000_0000_0000_0000_0000;
+        const Ifrit_Magma_Drive   = 0b0000_0000_0100_0000_0000_0000_0000_0000;
+        const Ifrit_Kick_13_1     = 0b0000_0000_0010_0000_0000_0000_0000_0000;
+        const Ifrit_Kick_13_2     = 0b0000_0000_0001_0000_0000_0000_0000_0000;
+        const Ifrit_Meteor_1      = 0b0000_0000_0000_1000_0000_0000_0000_0000;
+        const Ifrit_Meteor_2      = 0b0000_0000_0000_0100_0000_0000_0000_0000;
+        const Ifrit_Inferno       = 0b0000_0000_0000_0010_0000_0000_0000_0000;
+    }
+}
 
 pub(crate) fn reset_expertise() {
     match game_manager::with_session(|s| {

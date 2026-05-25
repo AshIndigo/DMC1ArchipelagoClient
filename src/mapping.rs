@@ -15,68 +15,8 @@ pub struct OverlayInfo {
 
 pub static MAPPING: LazyLock<RwLock<Option<Mapping>>> = LazyLock::new(|| RwLock::new(None));
 
-fn default_gun() -> String {
-    "Handgun".to_string()
-}
-
-fn default_melee() -> String {
-    "Force Edge".to_string()
-}
-
 fn default_goal() -> Goal {
     Goal::Standard
-}
-
-/// Converts the option number from the slot data into a more usable gun name
-fn parse_gun_number<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let val = Value::deserialize(deserializer)?;
-    match val {
-        Value::Number(n) => match n.as_i64().unwrap_or_default() {
-            0 => Ok("Handgun".to_string()),
-            1 => Ok("Shotgun".to_string()),
-            // Needlegun wouldn't be usable
-            //2 => Ok("Needlegun".to_string()),
-            3 => Ok("Grenade Launcher".to_string()),
-            4 => Ok("Nightmare Beta".to_string()),
-            _ => Err(serde::de::Error::custom(format!(
-                "Invalid gun number: {}",
-                n
-            ))),
-        },
-        Value::String(s) => Ok(s),
-        other => Err(serde::de::Error::custom(format!(
-            "Unexpected type: {:?}",
-            other
-        ))),
-    }
-}
-
-/// Converts the option number from the slot data into a more usable melee name
-fn parse_melee_number<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let val = Value::deserialize(deserializer)?;
-    match val {
-        Value::Number(n) => match n.as_i64().unwrap_or_default() {
-            0 => Ok("Force Edge".to_string()),
-            1 => Ok("Alastor".to_string()),
-            2 => Ok("Ifrit".to_string()),
-            3 => Ok("Sparda".to_string()),
-            _ => Err(serde::de::Error::custom(format!(
-                "Invalid melee number: {}",
-                n
-            ))),
-        },
-        Value::String(s) => Ok(s),
-        other => Err(serde::de::Error::custom(format!(
-            "Unexpected type: {:?}",
-            other
-        ))),
-    }
 }
 
 /// Figure out which DL setting were on
@@ -125,16 +65,49 @@ where
     }
 }
 
+fn parse_hint<'de, D>(deserializer: D) -> Result<AutoHint, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let val = Value::deserialize(deserializer)?;
+    match val {
+        Value::Number(n) => match AutoHint::from_repr(n.as_i64().unwrap_or_default() as usize) {
+            None => Err(serde::de::Error::custom(format!(
+                "Invalid autohint option: {}",
+                n
+            ))),
+            Some(n) => Ok(n),
+        },
+        other => Err(serde::de::Error::custom(format!(
+            "Unexpected type: {:?}",
+            other
+        ))),
+    }
+}
+
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Default,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    PartialOrd,
+    strum_macros::Display,
+    strum_macros::FromRepr,
+)]
+pub enum AutoHint {
+    All,
+    Current,
+    /// Only Relevant for weapons/guns
+    Obtained,
+    #[default]
+    None,
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Mapping {
-    // For mapping JSON
-    pub starter_items: Vec<String>,
-    #[serde(default = "default_melee")]
-    #[serde(deserialize_with = "parse_melee_number")]
-    pub start_melee: String,
-    #[serde(default = "default_gun")]
-    #[serde(deserialize_with = "parse_gun_number")]
-    pub start_gun: String,
     pub randomize_skills: bool,
     pub purple_orb_mode: bool,
     pub devil_trigger_mode: bool,
@@ -143,6 +116,9 @@ pub struct Mapping {
     #[serde(default = "default_goal")]
     #[serde(deserialize_with = "parse_goal")]
     pub goal: Goal,
+    pub shop_orb_checks: bool,
+    #[serde(deserialize_with = "parse_hint")]
+    pub auto_orb_hints: AutoHint,
     pub mission_order: Option<Vec<u8>>,
     pub generated_version: Option<APVersion>,
     pub client_version: Option<APVersion>,

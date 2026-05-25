@@ -9,7 +9,6 @@ pub const MAX_HP: u8 = 30;
 pub const INITIAL_HP: u8 = 10; // 15 for easy
 pub const MAX_MAGIC: u8 = 10;
 pub const INITIAL_MAGIC: u8 = 0; // 3 Normal and up, 6 on easy
-pub const NO_MISSION: u32 = 0;
 
 // Store categories
 pub const EXTRA_STORE: u8 = 0;
@@ -499,11 +498,11 @@ pub static MELEE_MAP: LazyLock<BiMap<&str, u8>> = LazyLock::new(|| {
     // Alastor: 2
     //
     let mut map = BiMap::new();
-    map.insert("Alastor", 1);
-    map.insert("Ifrit", 2);
-    map.insert("Sparda Air", 3);
-    map.insert("Sparda", 4);
-    map.insert("Force Edge", 0);
+    map.insert("Alastor", 0);
+    map.insert("Ifrit", 1);
+    map.insert("Sparda Air", 2);
+    map.insert("Sparda", 3);
+    map.insert("Force Edge", 4);
     map
 });
 pub static GUN_MAP: LazyLock<BiMap<&str, u8>> = LazyLock::new(|| {

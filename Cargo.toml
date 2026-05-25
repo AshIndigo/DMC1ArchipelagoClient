@@ -25,3 +25,4 @@ minhook = "0.9.0"
 imgui-sys = { version = "0.12.0" }
 imgui = "0.12.0"
 oneshot = "0.2.1"
+bitflags = "2.11.1"

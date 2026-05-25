@@ -1,9 +1,9 @@
 use crate::archipelago::CONNECTED;
-use crate::game_manager::{ARCHIPELAGO_DATA, ArchipelagoData};
+use crate::game_manager::{ArchipelagoData, ARCHIPELAGO_DATA};
 use crate::utilities::DMC1_ADDRESS;
-use crate::{AP_CORE, archipelago, create_hook};
-use minhook::MH_STATUS;
+use crate::{archipelago, create_hook, AP_CORE};
 use minhook::MinHook;
+use minhook::MH_STATUS;
 use randomizer_utilities::item_sync::CURRENT_INDEX;
 use randomizer_utilities::{item_sync, read_data_from_address};
 use std::error::Error;
@@ -23,12 +23,12 @@ pub fn get_save_path() -> Result<String, Box<dyn Error>> {
         && let Some(client) = core.connection.client()
     {
         Ok(format!(
-            "archipelago/dmc1_{}_{}.sav",
-            client.seed_name(),
-            client.this_player().name()
+            "{}{}",
+            randomizer_utilities::get_room_path(client)?,
+            "dmc1.sav"
         ))
     } else {
-        Err("Connection unavailable".into())
+        Err("Connecting unavailable".into())
     }
 }
 
@@ -80,10 +80,10 @@ fn new_save_game(param_1: usize) {
     if read_data_from_address::<u8>(param_1 + 2) == 2 {
         unsafe {
             //let save_file_ptr = (param_1 + 0x70) as *const usize;
-            let save_file = (param_1 + 0x70) as *const u8;
+            let save_file = (read_data_from_address::<usize>(*DMC1_ADDRESS + SAVE_FILE_PTR) + 0x70)
+                as *const u8;
 
             let data = std::slice::from_raw_parts(save_file, SAVE_LENGTH).to_vec();
-
             fs::write(get_save_path().expect("Unable to get save path"), data)
                 .expect("Unable to save game");
         }

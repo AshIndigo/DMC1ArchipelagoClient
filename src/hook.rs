@@ -5,17 +5,16 @@ use crate::constants::{
     get_items_by_category,
 };
 use crate::game_manager::{
-    ARCHIPELAGO_DATA, CHANGE_EQUIPPED_GUN, CHANGE_EQUIPPED_MELEE, CHANGE_MELEE_FORM, get_room,
-    get_track, with_active_player_data, with_session, with_session_read,
+    ARCHIPELAGO_DATA, CHANGE_EQUIPPED_GUN, UPDATE_WEAPONS, get_room, get_track,
+    with_active_player_data, with_session, with_session_read,
 };
-use crate::mapping::MAPPING;
 use crate::save_handler::setup_save_hooks;
 use crate::ui::text_handler;
 use crate::ui::text_handler::ORIGINAL_DRAW_TEXT;
 use crate::utilities::DMC1_ADDRESS;
 use crate::{check_handler, constants, create_hook, save_handler, skill_manager, utilities};
 use minhook::{MH_STATUS, MinHook};
-use randomizer_utilities::read_data_from_address;
+use randomizer_utilities::{read_data_from_address, replace_single_byte};
 use std::ptr::write;
 use std::sync::atomic::Ordering;
 use std::sync::{LazyLock, OnceLock};
@@ -42,6 +41,12 @@ pub(crate) unsafe fn create_hooks() -> Result<(), MH_STATUS> {
             ORIGINAL_DRAW_TEXT,
             "Draw text"
         );
+        create_hook!(
+            SET_PLAYER_DATA_ADRR,
+            set_player_data,
+            ORIGINAL_SET_PLAYER_DATA,
+            "Set Player Data"
+        );
     }
     Ok(())
 }
@@ -50,6 +55,7 @@ static HOOK_ADDRESSES: LazyLock<Vec<usize>> = LazyLock::new(|| {
     let mut addrs = vec![
         LOAD_ROOM_ADDR,
         SETUP_NEW_SESSION_ADDR,
+        SET_PLAYER_DATA_ADRR,
         text_handler::DRAW_TEXT_ADDR,
     ];
     check_handler::add_hooks_to_list(&mut addrs);
@@ -75,6 +81,15 @@ pub(crate) fn enable_hooks() {
             }
         }
     }
+}
+
+const SET_PLAYER_DATA_ADRR: usize = 0x2c5590;
+static ORIGINAL_SET_PLAYER_DATA: OnceLock<unsafe extern "C" fn(usize)> = OnceLock::new();
+pub fn set_player_data(player_data: usize) {
+    if let Some(func) = ORIGINAL_SET_PLAYER_DATA.get() {
+        unsafe { func(player_data) }
+    }
+    set_equipment();
 }
 
 // 0x3c8600 - I think this is maybe just inventory stuff?
@@ -162,42 +177,46 @@ fn set_max_hp_and_magic() {
 // TODO I think this is still a bit weird. Need to do a proper test of all starting melees. Guns are fine I think
 fn set_equipment() {
     let data = ARCHIPELAGO_DATA.read().unwrap();
-    if let Some(mapping) = MAPPING.read().unwrap().as_ref() {
-        with_active_player_data(|d| {
-            if !data.items.contains(
-                *constants::GUN_MAP
-                    .get_by_right(&d.gun)
-                    .unwrap_or_else(|| panic!("Unexpected gun value: {}", d.gun)),
-            ) {
-                // Set the actor data and make sure to update the equipped gun, otherwise weirdness happens (I.e double wielding shotguns)
-                d.gun = *constants::GUN_MAP
-                    .get_by_left(mapping.start_gun.as_str())
-                    .unwrap();
-                CHANGE_EQUIPPED_GUN(d.gun as u32);
-            }
-            if !data.items.contains(
-                *constants::MELEE_MAP
-                    .get_by_right(&d.melee)
-                    .unwrap_or_else(|| panic!("Unexpected melee value: {}", d.melee)),
-            ) {
-                // Set actor data then update melee
-                d.melee = *constants::MELEE_MAP
-                    .get_by_left(mapping.start_melee.as_str())
-                    .unwrap();
-
-                if d.melee == 4 {
-                    d.melee_form = 1;
-                    CHANGE_MELEE_FORM(1);
-                } else {
-                    d.melee_form = 0;
-                    CHANGE_MELEE_FORM(0);
+    with_active_player_data(|d| {
+        if !data.items.contains(
+            *constants::GUN_MAP
+                .get_by_right(&d.gun)
+                .unwrap_or_else(|| panic!("Unexpected gun value: {}", d.gun)),
+        ) {
+            // Set the actor data and make sure to update the equipped gun, otherwise weirdness happens (I.e double wielding shotguns)
+            for (gun, idx) in constants::GUN_MAP.iter() {
+                if data.items.contains(*gun) {
+                    d.gun = *idx;
+                    CHANGE_EQUIPPED_GUN(d.gun as u32);
+                    break;
                 }
-                CHANGE_EQUIPPED_MELEE(d.melee as u32, 0);
-                log::debug!("Setting actor melee to: {}", d.melee)
             }
-        })
-        .unwrap();
-    }
+        }
+        if !data.items.contains(
+            *constants::MELEE_MAP
+                .get_by_right(&d.melee)
+                .unwrap_or_else(|| panic!("Unexpected melee value: {}", d.melee)),
+        ) {
+            // Set actor data then update melee
+            for (melee, idx) in constants::MELEE_MAP.iter() {
+                if data.items.contains(*melee) {
+                    d.melee = *idx;
+                    //CHANGE_EQUIPPED_MELEE(d.melee, 0);
+                    if *melee == "Sparda" {
+                        d.melee_form = 1;
+                    }
+                    // Set updateMeleeWeapon TODO Remove and replace with CHANGE_EQUIPPED_MELEE/CHANGE_MELEE_FORM?
+                    const WEAPON_DATA: usize = 0x60AD10;
+                    let data_addr: usize = read_data_from_address(*DMC1_ADDRESS + WEAPON_DATA);
+                    unsafe { replace_single_byte(data_addr + 0xACA1, 1) };
+                    break;
+                }
+            }
+            UPDATE_WEAPONS();
+            log::debug!("Setting actor melee to: {}", d.melee)
+        }
+    })
+    .unwrap();
 }
 
 fn set_weapons_in_inv() {

@@ -424,12 +424,14 @@ pub static _ADD_ORB_FUNC: LazyLock<extern "C" fn(i32)> =
 pub static CHANGE_EQUIPPED_GUN: LazyLock<extern "C" fn(u32)> =
     LazyLock::new(|| unsafe { transmute::<usize, extern "C" fn(u32)>(*DMC1_ADDRESS + 0x2C4C50) });
 
-pub static CHANGE_MELEE_FORM: LazyLock<extern "C" fn(u32)> =
+pub static _CHANGE_MELEE_FORM: LazyLock<extern "C" fn(u32)> =
     LazyLock::new(|| unsafe { transmute::<usize, extern "C" fn(u32)>(*DMC1_ADDRESS + 0x2C4A00) });
 
-pub static CHANGE_EQUIPPED_MELEE: LazyLock<extern "C" fn(u32, u32)> = LazyLock::new(|| unsafe {
-    transmute::<usize, extern "C" fn(u32, u32)>(*DMC1_ADDRESS + 0x2C99C0)
+pub static _CHANGE_EQUIPPED_MELEE: LazyLock<extern "C" fn(u8, u32)> = LazyLock::new(|| unsafe {
+    transmute::<usize, extern "C" fn(u8, u32)>(*DMC1_ADDRESS + 0x2C99C0)
 });
+pub static UPDATE_WEAPONS: LazyLock<extern "C" fn()> =
+    LazyLock::new(|| unsafe { transmute::<usize, extern "C" fn()>(*DMC1_ADDRESS + 0x3C8DC0) });
 
 pub(crate) fn give_red_orbs(orbs: u32) {
     with_session(|s| {

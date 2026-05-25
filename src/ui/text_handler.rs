@@ -126,6 +126,7 @@ static LOOKUP_TABLE: LazyLock<HashMap<char, u8>> = LazyLock::new(|| {
         ('á', 0x72),
         //('', 0x73),
         ('█', 0x74), // Blackbox...
+                     // Kind of impressive there's no # symbol
     ])
 });
 

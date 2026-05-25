@@ -342,6 +342,7 @@ fn handle_item_receive(
     client: &mut Client<Mapping>,
     received_item: Location,
 ) -> Result<(), Box<dyn Error>> {
+    // TODO Overlay display for checks that don't give an item prompt (Mission Completes and Store checks)
     // See if there's an item!
     log::info!("Processing item: {}", received_item);
     let location_key = location_handler::get_location_name_by_data(&received_item, client)?;
@@ -385,10 +386,10 @@ const GENERIC_CHECKS: u32 = 40;
 pub fn run_setup(client: &mut Client<Mapping>) -> Result<(), Box<dyn Error>> {
     log::info!("Running setup");
     // Shop checks
-    // TODO Hint options
-    mapping::run_scouts_for_mission(client, GENERIC_CHECKS, CreateAsHint::New);
-    mapping::run_scouts_for_mission(client, NO_MISSION, CreateAsHint::No);
-    for i in 1..=23 {
+    if client.slot_data().shop_orb_checks {
+        mapping::run_scouts_for_mission(client, GENERIC_CHECKS, CreateAsHint::No);
+    }
+    for i in 0..=23 {
         mapping::run_scouts_for_mission(client, i, CreateAsHint::No);
     }
     mapping::run_scouts_for_secret_mission(client);
