@@ -1,4 +1,4 @@
-use crate::constants::Difficulty;
+use crate::constants::{Difficulty, Event};
 use crate::mapping::MAPPING;
 use crate::utilities::DMC1_ADDRESS;
 use randomizer_utilities::read_data_from_address;
@@ -117,7 +117,7 @@ pub struct SessionData {
     unknown2: [u8; 86],
     var_90: [u32; 5],
     unknown3: [u8; 7168],
-    event: u32,
+    pub(crate) event: Event,
     unknown4a: [u8; 112],
     pub(crate) rank: i32,
     unknown4b: [u8; 328],

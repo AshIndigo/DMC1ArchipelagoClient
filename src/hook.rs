@@ -12,12 +12,13 @@ use crate::save_handler::setup_save_hooks;
 use crate::ui::text_handler;
 use crate::ui::text_handler::ORIGINAL_DRAW_TEXT;
 use crate::utilities::DMC1_ADDRESS;
-use crate::{check_handler, constants, create_hook, save_handler, skill_manager, utilities};
+use crate::{archipelago, check_handler, constants, create_hook, save_handler, skill_manager, utilities, AP_CORE};
 use minhook::{MH_STATUS, MinHook};
 use randomizer_utilities::{read_data_from_address, replace_single_byte};
 use std::ptr::write;
 use std::sync::atomic::Ordering;
 use std::sync::{LazyLock, OnceLock};
+use randomizer_utilities::item_sync::CURRENT_INDEX;
 
 pub(crate) unsafe fn create_hooks() -> Result<(), MH_STATUS> {
     setup_check_hooks()?;
@@ -111,6 +112,18 @@ pub fn setup_new_session_data() {
         .unwrap();
     })
     .unwrap();
+    match AP_CORE.get().unwrap().lock() {
+        Ok(mut core) => {
+            CURRENT_INDEX.store(0, Ordering::SeqCst);
+            let client = core.connection.client_mut().unwrap();
+            if let Err(e) = archipelago::handle_received_items_packet(0, client) {
+                log::error!("Failed to handle received items: {:?}", e);
+            }
+        }
+        Err(err) => {
+            log::error!("Error locking core: {}", err);
+        }
+    }
 }
 
 const LOAD_ROOM_ADDR: usize = 0x255cc0;

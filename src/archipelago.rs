@@ -1,8 +1,10 @@
 use crate::check_handler::{Location, TX_LOCATION};
 use crate::constants::*;
-use crate::game_manager::{ARCHIPELAGO_DATA, ArchipelagoData, get_mission, with_session};
+use crate::game_manager::{
+    ARCHIPELAGO_DATA, ArchipelagoData, get_mission, with_session, with_session_read,
+};
 use crate::mapping::{DeathlinkSetting, MAPPING, Mapping, OVERLAY_INFO, OverlayInfo};
-use crate::{game_manager, hook, location_handler, mapping, skill_manager, utilities};
+use crate::{constants, game_manager, hook, location_handler, mapping, skill_manager, utilities};
 use archipelago_rs::{
     AsItemId, Client, Connection, ConnectionOptions, ConnectionState, CreateAsHint,
     DeathLinkOptions, Event, ItemHandling,
@@ -13,6 +15,7 @@ use randomizer_utilities::ui::font_handler::{WHITE, YELLOW};
 use randomizer_utilities::ui::overlay_messages;
 use randomizer_utilities::ui::overlay_messages::{MessageSegment, MessageType, OverlayMessage};
 use randomizer_utilities::{archipelago_utilities, item_sync, setup_channel_pair};
+use std::collections::VecDeque;
 use std::error::Error;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,6 +27,7 @@ pub static TX_DEATHLINK: OnceLock<Sender<DeathLinkData>> = OnceLock::new();
 
 pub struct ArchipelagoCore {
     pub connection: Connection<Mapping>,
+    received_items_queue: VecDeque<usize>,
     hooks_installed: bool,
     hooks_enabled: bool,
 
@@ -43,6 +47,7 @@ impl ArchipelagoCore {
                     starting_inventory: true,
                 }),
             ),
+            received_items_queue: VecDeque::new(),
             hooks_installed: false,
             hooks_enabled: false,
             location_receiver: setup_channel_pair(&TX_LOCATION),
@@ -62,6 +67,7 @@ impl ArchipelagoCore {
                     overlay_info.generated_version = mapping.generated_version;
                     overlay_info.client_version = mapping.client_version;
                     MAPPING.write()?.replace(mapping.clone());
+                    self.received_items_queue.clear();
                     item_sync::send_offline_checks(self.connection.client_mut().unwrap())?;
                     if !self.hooks_installed {
                         // Hooks needed to modify the game
@@ -108,7 +114,7 @@ impl ArchipelagoCore {
                     log::info!("Print from server: {}", str);
                 }
                 Event::ReceivedItems(idx) => {
-                    handle_received_items_packet(idx, self.connection.client_mut().unwrap())?;
+                    self.received_items_queue.push_back(idx);
                 }
                 Event::Error(err) => log::error!("{}", err),
                 Event::Bounce {
@@ -161,6 +167,15 @@ impl ArchipelagoCore {
             }
         }
         self.handle_channels()?;
+        let _ = with_session_read(|s| {
+            if s.event.contains(constants::Event::Ingame)
+                && let Some(idx) = self.received_items_queue.pop_front()
+                && let Err(e) =
+                    handle_received_items_packet(idx, self.connection.client_mut().unwrap())
+            {
+                log::error!("Failed to receive items: {:?}", e);
+            }
+        });
         Ok(())
     }
 
@@ -209,6 +224,8 @@ pub(crate) fn handle_received_items_packet(
 
     match ARCHIPELAGO_DATA.write() {
         Ok(mut data) => {
+            data.blue_orbs = 0;
+            data.purple_orbs = 0;
             for item in client.received_items().iter() {
                 // Display overlay text if we're not at the main menu
                 if !utilities::is_on_main_menu()
@@ -231,7 +248,7 @@ pub(crate) fn handle_received_items_packet(
                         MessageType::Notification,
                     ));
                 }
-
+                data.add_item(item.item().name().into());
                 match item.item().as_item_id() {
                     41..=43 => {
                         if item.index() >= CURRENT_INDEX.load(Ordering::SeqCst) as usize {
@@ -253,12 +270,16 @@ pub(crate) fn handle_received_items_packet(
                     6 => {
                         data.add_blue_orb();
                         //ADD_ORB_FUNC(0);
-                        game_manager::give_hp(1);
+                        if item.index() >= CURRENT_INDEX.load(Ordering::SeqCst) as usize {
+                            game_manager::give_hp(1);
+                        }
                     }
                     7 => {
                         data.add_purple_orb();
                         //ADD_ORB_FUNC(1);
-                        game_manager::give_magic(1, &data);
+                        if item.index() >= CURRENT_INDEX.load(Ordering::SeqCst) as usize {
+                            game_manager::give_magic(1, &data);
+                        }
                     }
                     8..=11 => {
                         // Weapons
@@ -287,7 +308,9 @@ pub(crate) fn handle_received_items_packet(
                         // for _ in 0..3 {
                         //     ADD_ORB_FUNC(1);
                         // }
-                        game_manager::give_magic(3, &data);
+                        if item.index() >= CURRENT_INDEX.load(Ordering::SeqCst) as usize {
+                            game_manager::give_magic(3, &data);
+                        }
                     }
                     18..=38 => {
                         // For key items
@@ -324,7 +347,6 @@ pub(crate) fn handle_received_items_packet(
                         )
                     }
                 }
-                data.add_item(item.item().name().into());
                 if item.index() >= CURRENT_INDEX.load(Ordering::SeqCst) as usize {
                     CURRENT_INDEX.store((item.index() + 1) as i64, Ordering::SeqCst);
                 }
@@ -342,7 +364,6 @@ fn handle_item_receive(
     client: &mut Client<Mapping>,
     received_item: Location,
 ) -> Result<(), Box<dyn Error>> {
-    // TODO Overlay display for checks that don't give an item prompt (Mission Completes and Store checks)
     // See if there's an item!
     log::info!("Processing item: {}", received_item);
     let location_key = location_handler::get_location_name_by_data(&received_item, client)?;
@@ -352,6 +373,24 @@ fn handle_item_receive(
         .get(location_key)
     {
         Some(located_item) => {
+            if received_item.to_display {
+                let rec_msg: Vec<MessageSegment> = vec![
+                    MessageSegment::new("Sent ".to_string(), WHITE),
+                    MessageSegment::new(
+                        located_item.item().name().to_string(),
+                        overlay_messages::get_color_for_item(located_item),
+                    ),
+                    MessageSegment::new(" to ".to_string(), WHITE),
+                    MessageSegment::new(located_item.receiver().alias().parse()?, YELLOW),
+                ];
+                overlay_messages::add_message(OverlayMessage::new(
+                    rec_msg,
+                    Duration::from_secs(3),
+                    0.0,
+                    0.0,
+                    MessageType::Notification,
+                ));
+            }
             if let Err(arch_err) = client.mark_checked(vec![located_item.location()]) {
                 log::error!("Failed to check location: {}", arch_err);
                 item_sync::add_offline_check(located_item.location().id());

@@ -1,5 +1,6 @@
 use crate::game_manager::ItemData;
 use bimap::BiMap;
+use bitflags::bitflags;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
@@ -516,11 +517,19 @@ pub static GUN_MAP: LazyLock<BiMap<&str, u8>> = LazyLock::new(|| {
     map
 });
 
-#[derive(Copy, Clone, strum_macros::Display, strum_macros::FromRepr)]
+#[derive(Copy, Clone, strum_macros::Display, strum_macros::FromRepr, PartialEq)]
 pub(crate) enum Rank {
     S = 0,
     A = 1,
     B = 2,
     C = 3,
     D = 4,
+}
+
+bitflags! {
+    #[repr(C)]
+    pub struct Event: u32 {
+        const Ingame   = 0b0000_0000_0000_0000_0010_0000_0000_0000;
+        const Teleport = 0b0001_0000_0000_0000_0000_0000_0000_0000;
+    }
 }

@@ -1,9 +1,9 @@
 use crate::archipelago::CONNECTED;
-use crate::game_manager::{ArchipelagoData, ARCHIPELAGO_DATA};
+use crate::game_manager::{ARCHIPELAGO_DATA, ArchipelagoData};
 use crate::utilities::DMC1_ADDRESS;
-use crate::{archipelago, create_hook, AP_CORE};
-use minhook::MinHook;
+use crate::{AP_CORE, archipelago, create_hook};
 use minhook::MH_STATUS;
+use minhook::MinHook;
 use randomizer_utilities::item_sync::CURRENT_INDEX;
 use randomizer_utilities::{item_sync, read_data_from_address};
 use std::error::Error;

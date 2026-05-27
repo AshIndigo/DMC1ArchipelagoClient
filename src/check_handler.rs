@@ -36,6 +36,7 @@ pub(crate) struct Location {
     pub(crate) mission: u32,
     pub coordinates: Coordinates,
     pub(crate) item_category: u8,
+    pub to_display: bool,
 }
 
 impl Display for Location {
@@ -119,6 +120,7 @@ pub fn item_pickup() {
                 track: get_track(),
                 mission: get_mission() as u32,
                 coordinates: EMPTY_COORDINATES,
+                to_display: false,
             };
             // Send off information
             send_off_location_coords(received_item);
@@ -283,13 +285,15 @@ fn mission_complete() {
         }
     }
     with_session_read(|session| {
+        let rank = Rank::from_repr(session.rank as usize).unwrap();
         let difficulty = Difficulty::from_repr(session.difficulty as usize).unwrap();
         log::debug!(
             "Mission {} Complete - Difficulty: {} - Rank: {}",
             session.mission - 1,
             difficulty,
-            Rank::from_repr(session.rank as usize).unwrap()
+            rank
         );
+        // TODO Min Difficulty check
         send_off_location_coords(Location {
             location_type: LocationType::MissionComplete,
             item_id: u32::MAX,
@@ -298,7 +302,12 @@ fn mission_complete() {
             mission: (session.mission - 1) as u32,
             coordinates: EMPTY_COORDINATES,
             item_category: 0,
+            to_display: true,
         });
+        if rank == Rank::S {
+            // TODO This is where an S Rank check would be sent?
+            log::debug!("S Rank detected")
+        }
         // Silly
         if let Ok(mut core) = AP_CORE.get().unwrap().try_lock()
             && let Some(client) = core.connection.client_mut()
@@ -363,6 +372,7 @@ pub fn purchase_item() {
                         coordinates: EMPTY_COORDINATES,
                         track: 0,
                         item_category: category,
+                        to_display: true,
                     });
                 }
             }
