@@ -12,13 +12,16 @@ use crate::save_handler::setup_save_hooks;
 use crate::ui::text_handler;
 use crate::ui::text_handler::ORIGINAL_DRAW_TEXT;
 use crate::utilities::DMC1_ADDRESS;
-use crate::{archipelago, check_handler, constants, create_hook, save_handler, skill_manager, utilities, AP_CORE};
+use crate::{
+    AP_CORE, archipelago, check_handler, constants, create_hook, save_handler, skill_manager,
+    utilities,
+};
 use minhook::{MH_STATUS, MinHook};
+use randomizer_utilities::item_sync::CURRENT_INDEX;
 use randomizer_utilities::{read_data_from_address, replace_single_byte};
 use std::ptr::write;
 use std::sync::atomic::Ordering;
 use std::sync::{LazyLock, OnceLock};
-use randomizer_utilities::item_sync::CURRENT_INDEX;
 
 pub(crate) unsafe fn create_hooks() -> Result<(), MH_STATUS> {
     setup_check_hooks()?;
